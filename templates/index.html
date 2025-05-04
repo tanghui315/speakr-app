@@ -8,71 +8,59 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Add a subtle transition for dragover effect */
-        .drag-area {
-            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        /* Existing styles... */
+        .drag-area { transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c5c5c5; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        html, body { height: 100%; margin: 0; }
+        #app { min-height: 100%; display: flex; flex-direction: column; }
+        main { flex-grow: 1; position: relative; }
+        .progress-popup { position: fixed; bottom: 1rem; left: 1rem; z-index: 100; transition: all 0.3s ease-in-out; min-width: 300px; }
+        .progress-popup.minimized { transform: translateY(calc(100% - 45px)); }
+        .progress-list-item { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; }
+         /* Add style for summary pre */
+        .summary-box {
+            background-color: #f9fafb; /* bg-gray-50 */
+            padding: 0.75rem; /* p-3 */
+            border-radius: 0.375rem; /* rounded */
+            border: 1px solid #e5e7eb; /* border-gray-200 */
+            min-height: 60px; /* min-h-[60px] or adjust as needed */
+            max-height: 20rem; /* Limit height */
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: inherit; /* Use body font */
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.25rem;
         }
-         /* Custom scrollbar for webkit browsers (optional) */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #c5c5c5;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
-        }
-        /* Ensure body takes full height for drop zone */
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
-        #app {
-            min-height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-        main {
-            flex-grow: 1;
-            position: relative; /* Needed for absolute positioning of drag overlay */
-        }
-        /* Progress Popup Styles */
-        .progress-popup {
-            position: fixed;
-            bottom: 1rem;
-            left: 1rem;
-            z-index: 100; /* Ensure it's above other elements */
-            transition: all 0.3s ease-in-out;
-            min-width: 300px; /* Minimum width */
-        }
-        .progress-popup.minimized {
-            transform: translateY(calc(100% - 45px)); /* Adjust based on header height */
-        }
-         .progress-list-item {
-             display: grid;
-             grid-template-columns: auto 1fr auto;
-             gap: 0.5rem;
-             align-items: center;
+         .status-badge {
+             display: inline-block;
+             padding: 0.125rem 0.5rem; /* px-2 py-0.5 */
+             font-size: 0.75rem; /* text-xs */
+             font-weight: 600; /* font-semibold */
+             border-radius: 9999px; /* rounded-full */
+             margin-top: 0.5rem; /* mt-2 */
          }
+         .status-processing { color: #1d4ed8; background-color: #dbeafe; } /* text-blue-800 bg-blue-100 */
+         .status-summarizing { color: #92400e; background-color: #fef3c7; } /* text-amber-800 bg-amber-100 */
+         .status-completed { color: #065f46; background-color: #d1fae5; } /* text-green-800 bg-green-100 */
+         .status-failed { color: #991b1b; background-color: #fee2e2; } /* text-red-800 bg-red-100 */
+         .status-pending { color: #57534e; background-color: #f5f5f4; } /* text-stone-700 bg-stone-100 */
 
     </style>
 </head>
 <body class="bg-gray-100">
     <div id="app" class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col">
         <header class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-            <h1 class="text-3xl font-bold text-gray-800 cursor-pointer" @click="switchToGalleryView" title="Go to Gallery">
-                Audio Transcription
+             <h1 class="text-3xl font-bold text-gray-800 cursor-pointer" @click="switchToGalleryView" title="Go to Gallery">
+                Audio Transcription & Summary
             </h1>
             <div>
                 <button @click="switchToUploadView" class="px-4 py-2 mr-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out">
                     <i class="fas fa-plus mr-1"></i> New Recording
                 </button>
-                <button
+                 <button
                     @click="switchToGalleryView"
                     :class="{
                         'bg-white text-gray-700 border border-gray-300': currentView !== 'gallery',
@@ -85,7 +73,7 @@
         </header>
 
         <div v-if="globalError" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg" role="alert">
-            <div class="flex justify-between items-center">
+             <div class="flex justify-between items-center">
                 <div>
                     <strong class="font-bold">Error:</strong>
                     <span class="block sm:inline ml-2">${ globalError }</span>
@@ -95,123 +83,151 @@
         </div>
 
         <main class="flex-grow"
-              @dragover.prevent="dragover = true"
-              @dragleave.prevent="handleDragLeave"
-              @drop.prevent="handleDrop">
+             @dragover.prevent="dragover = true"
+             @dragleave.prevent="handleDragLeave"
+             @drop.prevent="handleDrop">
 
-             <div v-if="dragover" class="absolute inset-0 flex items-center justify-center bg-blue-500 bg-opacity-20 z-10 rounded-lg pointer-events-none border-4 border-dashed border-blue-600">
-                 <div class="text-center p-6 bg-white rounded-lg shadow-xl">
-                     <i class="fas fa-upload text-4xl text-blue-500 mb-3"></i>
-                     <p class="text-xl font-semibold text-gray-700">Drop audio file(s) here to upload</p>
-                 </div>
-             </div>
+            <div v-if="dragover" class="absolute inset-0 flex items-center justify-center bg-blue-500 bg-opacity-20 z-10 rounded-lg pointer-events-none border-4 border-dashed border-blue-600">
+                <div class="text-center p-6 bg-white rounded-lg shadow-xl">
+                    <i class="fas fa-upload text-4xl text-blue-500 mb-3"></i>
+                    <p class="text-xl font-semibold text-gray-700">Drop audio file(s) here to upload</p>
+                </div>
+            </div>
 
             <div v-if="currentView === 'gallery'" class="flex-grow flex flex-col rounded-lg">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-grow">
+                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-grow">
                     <div class="lg:col-span-1 bg-white p-4 rounded-lg shadow-md flex flex-col">
                         <h3 class="text-lg font-semibold mb-4 sticky top-0 bg-white pb-3 border-b border-gray-200">Recordings</h3>
-                        <div v-if="isLoadingRecordings" class="text-center text-gray-500 py-4">
+                         <div v-if="isLoadingRecordings" class="text-center text-gray-500 py-4">
                             <i class="fas fa-spinner fa-spin mr-2"></i> Loading recordings...
                         </div>
-                         <div v-else-if="recordings.length === 0 && uploadQueue.length === 0" class="text-center text-gray-500 py-4 flex-grow flex flex-col items-center justify-center">
-                            <i class="fas fa-folder-open text-4xl text-gray-400 mb-3"></i>
+                        <div v-else-if="recordings.length === 0 && uploadQueue.length === 0" class="text-center text-gray-500 py-4 flex-grow flex flex-col items-center justify-center">
+                             <i class="fas fa-folder-open text-4xl text-gray-400 mb-3"></i>
                             <p>No recordings yet.</p>
                             <p>Upload one or drag & drop anywhere!</p>
                         </div>
                         <div v-else class="space-y-4 overflow-y-auto custom-scrollbar flex-grow pr-1">
-                             <div v-for="group in groupedRecordings" :key="group.title" class="mb-3">
-                                 <h4 class="font-medium text-gray-500 text-xs uppercase tracking-wider mb-2 sticky top-0 bg-white py-1">${ group.title }</h4>
-                                 <ul class="space-y-1">
-                                     <li v-for="recording in group.items"
-                                         :key="recording.id"
-                                         @click="selectRecording(recording)"
-                                         class="cursor-pointer p-3 rounded-md flex justify-between items-center transition duration-150 ease-in-out"
-                                         :class="{
-                                             'bg-blue-100 hover:bg-blue-200 ring-1 ring-blue-300': selectedRecording?.id === recording.id,
-                                             'hover:bg-gray-100': selectedRecording?.id !== recording.id
-                                         }">
+                            <div v-for="group in groupedRecordings" :key="group.title" class="mb-3">
+                                <h4 class="font-medium text-gray-500 text-xs uppercase tracking-wider mb-2 sticky top-0 bg-white py-1">${ group.title }</h4>
+                                <ul class="space-y-1">
+                                    <li v-for="recording in group.items"
+                                        :key="recording.id"
+                                        @click="selectRecording(recording)"
+                                        class="cursor-pointer p-3 rounded-md flex justify-between items-center transition duration-150 ease-in-out"
+                                        :class="{
+                                            'bg-blue-100 hover:bg-blue-200 ring-1 ring-blue-300': selectedRecording?.id === recording.id,
+                                            'hover:bg-gray-100': selectedRecording?.id !== recording.id
+                                        }">
                                          <div class="flex items-center overflow-hidden mr-2">
-                                             <i class="fas fa-file-audio text-blue-500 mr-2 flex-shrink-0"></i>
-                                             <span class="text-sm font-medium text-gray-800 truncate">${ recording.title }</span>
-                                         </div>
-                                         <div class="flex space-x-2 flex-shrink-0 items-center">
-                                              <span v-if="recording.status === 'PROCESSING' || recording.status === 'PENDING'" class="text-xs text-blue-600 italic flex items-center" title="Processing...">
-                                                 <i class="fas fa-spinner fa-spin mr-1"></i> Processing
-                                             </span>
-                                             <span v-else-if="recording.status === 'FAILED'" class="text-xs text-red-600 italic flex items-center" title="Transcription Failed">
-                                                 <i class="fas fa-exclamation-triangle mr-1"></i> Failed
-                                             </span>
-                                              <span v-else-if="recording.status === 'COMPLETED'" class="text-xs text-green-600" title="Completed">
-                                                 <i class="fas fa-check-circle"></i>
-                                             </span>
+                                            <i class="fas fa-file-audio text-blue-500 mr-2 flex-shrink-0"></i>
+                                            <span class="text-sm font-medium text-gray-800 truncate" :title="recording.title || 'Loading title...'">${ recording.title || '(Processing...)' }</span>
+                                        </div>
+                                        <div class="flex space-x-2 flex-shrink-0 items-center">
+                                            <span v-if="recording.status === 'PROCESSING'" class="text-xs text-blue-600 italic flex items-center" title="Transcribing...">
+                                                 <i class="fas fa-spinner fa-spin mr-1"></i> Transcribing
+                                            </span>
+                                             <span v-else-if="recording.status === 'SUMMARIZING'" class="text-xs text-amber-600 italic flex items-center" title="Generating Summary...">
+                                                <i class="fas fa-spinner fa-spin mr-1"></i> Summarizing
+                                            </span>
+                                            <span v-else-if="recording.status === 'PENDING'" class="text-xs text-gray-500 italic flex items-center" title="Waiting...">
+                                                <i class="fas fa-clock mr-1"></i> Pending
+                                            </span>
+                                            <span v-else-if="recording.status === 'FAILED'" class="text-xs text-red-600 italic flex items-center" title="Processing Failed">
+                                                <i class="fas fa-exclamation-triangle mr-1"></i> Failed
+                                            </span>
+                                            <span v-else-if="recording.status === 'COMPLETED'" class="text-xs text-green-600" title="Completed">
+                                                <i class="fas fa-check-circle"></i>
+                                            </span>
                                              <button @click.stop="editRecording(recording)" class="text-gray-500 hover:text-blue-600 text-xs p-1 rounded hover:bg-gray-200" title="Edit Details">
-                                                 <i class="fas fa-edit"></i>
-                                             </button>
-                                             <button @click.stop="confirmDelete(recording)" class="text-gray-500 hover:text-red-600 text-xs p-1 rounded hover:bg-gray-200" title="Delete Recording">
-                                                 <i class="fas fa-trash"></i>
-                                             </button>
-                                         </div>
-                                     </li>
-                                 </ul>
-                             </div>
-                         </div>
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click.stop="confirmDelete(recording)" class="text-gray-500 hover:text-red-600 text-xs p-1 rounded hover:bg-gray-200" title="Delete Recording">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-md flex flex-col">
-                        <div v-if="selectedRecording" class="flex-grow">
-                             <div class="flex flex-col sm:flex-row justify-between items-start mb-4 border-b border-gray-200 pb-4">
-                                 <div class="mb-3 sm:mb-0">
-                                     <h3 class="text-2xl font-semibold text-gray-900">${ selectedRecording.title }</h3>
-                                     <p class="text-sm text-gray-500 mt-1">
-                                         Created: ${ new Date(selectedRecording.created_at).toLocaleString() } | Size: ${ formatFileSize(selectedRecording.file_size) }
-                                     </p>
-                                      <span v-if="selectedRecording.status === 'PROCESSING' || selectedRecording.status === 'PENDING'" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Status: Processing</span>
-                                      <span v-else-if="selectedRecording.status === 'FAILED'" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Status: Failed</span>
-                                      <span v-else-if="selectedRecording.status === 'COMPLETED'" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Status: Completed</span>
-                                 </div>
-                                 <div class="flex space-x-2 flex-shrink-0">
-                                     <button @click="editRecording(selectedRecording)" class="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm shadow-sm">
-                                         <i class="fas fa-edit mr-1"></i> Edit Details
-                                     </button>
-                                     <button @click="confirmDelete(selectedRecording)" class="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm shadow-sm">
-                                         <i class="fas fa-trash mr-1"></i> Delete
-                                     </button>
-                                 </div>
-                             </div>
-                              <div class="grid md:grid-cols-2 gap-6">
-                                 <div>
-                                     <h4 class="font-semibold text-gray-700 mb-2">Transcription</h4>
-                                     <div v-if="selectedRecording.status === 'COMPLETED'" class="h-96 overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar">
-                                         <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'No transcription available.' }</pre>
-                                     </div>
-                                     <div v-else-if="selectedRecording.status === 'FAILED'" class="h-96 overflow-y-auto p-4 bg-red-50 rounded border border-red-200 text-sm text-red-700 custom-scrollbar">
-                                         <p class="font-medium mb-2">Transcription Failed:</p>
-                                         <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'An unknown error occurred.' }</pre>
-                                     </div>
-                                     <div v-else class="h-96 flex items-center justify-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-500">
-                                         <i class="fas fa-spinner fa-spin mr-2"></i> Transcription in progress...
-                                     </div>
-                                 </div>
-                                 <div class="space-y-4">
-                                     <div>
-                                         <h4 class="font-semibold text-gray-700 mb-2">Audio Player</h4>
-                                         <audio controls class="w-full" :key="selectedRecording.id" :src="'/audio/' + selectedRecording.id">
-                                             Your browser does not support the audio element.
-                                         </audio>
-                                     </div>
-                                     <div>
-                                         <h4 class="font-semibold text-gray-700 mb-1">Participants</h4>
-                                         <p class="text-sm bg-gray-50 p-3 rounded border border-gray-200 min-h-[40px]">${ selectedRecording.participants || 'None specified' }</p>
-                                     </div>
-                                     <div>
-                                         <h4 class="font-semibold text-gray-700 mb-1">Notes</h4>
-                                         <pre class="text-sm bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap h-40 overflow-y-auto custom-scrollbar font-sans">${ selectedRecording.notes || 'No notes' }</pre>
-                                     </div>
-                                 </div>
-                             </div>
-                        </div>
-                         <div v-else class="flex flex-col items-center justify-center text-center text-gray-500 flex-grow">
-                            <i class="fas fa-hand-pointer text-4xl text-gray-400 mb-4"></i>
+                     <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-md flex flex-col">
+                        <div v-if="selectedRecording" class="flex-grow flex flex-col">
+                            <div class="flex flex-col sm:flex-row justify-between items-start mb-4 border-b border-gray-200 pb-4">
+                                <div class="mb-3 sm:mb-0 max-w-lg">
+                                     <h3 class="text-2xl font-semibold text-gray-900">${ selectedRecording.title || 'Loading...' }</h3>
+                                    <p class="text-sm text-gray-500 mt-1">
+                                        Created: ${ new Date(selectedRecording.created_at).toLocaleString() } | Size: ${ formatFileSize(selectedRecording.file_size) }
+                                    </p>
+                                     <span :class="getStatusClass(selectedRecording.status)" class="status-badge">
+                                        Status: ${ formatStatus(selectedRecording.status) }
+                                     </span>
+                                </div>
+                                <div class="flex space-x-2 flex-shrink-0">
+                                    <button @click="editRecording(selectedRecording)" class="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm shadow-sm">
+                                        <i class="fas fa-edit mr-1"></i> Edit Details
+                                    </button>
+                                    <button @click="confirmDelete(selectedRecording)" class="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm shadow-sm">
+                                        <i class="fas fa-trash mr-1"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid md:grid-cols-2 gap-6 flex-grow overflow-hidden">
+                                <div class="flex flex-col overflow-hidden">
+                                    <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Transcription</h4>
+                                    <div class="flex-grow overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar">
+                                        <div v-if="selectedRecording.status === 'COMPLETED' || selectedRecording.status === 'SUMMARIZING'">
+                                            <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'No transcription available.' }</pre>
+                                        </div>
+                                        <div v-else-if="selectedRecording.status === 'FAILED'" class="text-red-700">
+                                             <p class="font-medium mb-2">Processing Failed:</p>
+                                             <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'An unknown error occurred.' }</pre>
+                                        </div>
+                                        <div v-else class="flex items-center justify-center text-gray-500 h-full">
+                                            <i class="fas fa-spinner fa-spin mr-2"></i> Transcription in progress...
+                                        </div>
+                                    </div>
+                                </div>
+
+                                 <div class="flex flex-col space-y-4 overflow-hidden">
+                                    <div>
+                                        <h4 class="font-semibold text-gray-700 mb-2">Audio Player</h4>
+                                        <audio controls class="w-full" :key="selectedRecording.id" :src="'/audio/' + selectedRecording.id">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+
+                                    <div class="flex flex-col overflow-hidden">
+                                        <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Summary</h4>
+                                         <div class="flex-grow overflow-hidden">
+                                            <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar">
+                                                ${ selectedRecording.summary || 'No summary generated.' }
+                                            </div>
+                                             <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-red-700 custom-scrollbar">
+                                                ${ selectedRecording.summary || 'Summary generation failed or was skipped.' }
+                                            </div>
+                                            <div v-else class="h-24 flex items-center justify-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-500">
+                                                <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 class="font-semibold text-gray-700 mb-1">Participants</h4>
+                                        <p class="text-sm bg-gray-50 p-3 rounded border border-gray-200 min-h-[40px]">${ selectedRecording.participants || 'None specified' }</p>
+                                    </div>
+                                    <div class="flex flex-col overflow-hidden flex-grow">
+                                         <h4 class="font-semibold text-gray-700 mb-1 flex-shrink-0">Notes</h4>
+                                        <div class="flex-grow overflow-hidden">
+                                            <pre class="text-sm bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap h-40 overflow-y-auto custom-scrollbar font-sans">${ selectedRecording.notes || 'No notes' }</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                         </div>
+                        <div v-else class="flex flex-col items-center justify-center text-center text-gray-500 flex-grow">
+                             <i class="fas fa-hand-pointer text-4xl text-gray-400 mb-4"></i>
                             <p class="text-lg font-medium mb-2">Select a recording from the list to view details.</p>
                             <p>Or, drag and drop audio file(s) anywhere on this page to upload.</p>
                         </div>
@@ -219,229 +235,183 @@
                 </div>
             </div>
 
-            <div v-if="currentView === 'upload'"
+             <div v-if="currentView === 'upload'"
                  class="flex-grow flex items-center justify-center p-4">
                  <div class="w-full max-w-lg bg-white p-8 rounded-xl shadow-lg border border-gray-200 text-center drag-area"
                      :class="{'border-blue-500 bg-blue-50': dragover}">
-                     <div class="py-8">
-                         <i class="fas fa-cloud-upload-alt text-5xl mb-5 text-blue-500"></i>
+                    <div class="py-8">
+                        <i class="fas fa-cloud-upload-alt text-5xl mb-5 text-blue-500"></i>
                          <h2 class="text-xl font-semibold text-gray-700 mb-2">Upload New Recordings</h2>
-                         <p class="text-gray-500 mb-4">Drag & drop your audio files here or click below.</p>
+                        <p class="text-gray-500 mb-4">Drag & drop your audio files here or click below.</p>
                          <input type="file" @change="handleFileSelect" accept="audio/*" class="hidden" ref="fileInput" multiple>
-                         <button @click="$refs.fileInput.click()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition duration-150 ease-in-out">
-                             <i class="fas fa-file-import mr-2"></i> Select Files
-                         </button>
+                        <button @click="$refs.fileInput.click()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition duration-150 ease-in-out">
+                            <i class="fas fa-file-import mr-2"></i> Select Files
+                        </button>
                          <p class="text-xs text-gray-400 mt-4">Max file size per file: ${ maxFileSizeMB } MB</p>
-                     </div>
-                 </div>
-             </div>
+                    </div>
+                </div>
+            </div>
 
-            <div v-if="currentView === 'input' && currentRecording" class="bg-white p-6 md:p-8 rounded-lg shadow-md border border-gray-200">
-                <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-                     <h2 class="text-2xl font-semibold text-gray-800">Recording Details</h2>
-                     <button @click="switchToGalleryView" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-150 ease-in-out">
-                         <i class="fas fa-arrow-left mr-2"></i> Back to Gallery
-                     </button>
-                 </div>
-                  <div class="grid md:grid-cols-2 gap-8">
-                     <div>
-                         <h3 class="text-lg font-semibold text-gray-700 mb-3">Transcription</h3>
-                         <div class="h-96 overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar">
-                              <pre class="whitespace-pre-wrap font-sans">${ currentRecording.transcription || 'Transcription not available.' }</pre>
-                         </div>
-                     </div>
-                     <div>
-                         <h3 class="text-lg font-semibold text-gray-700 mb-3">Add Recording Details</h3>
-                         <div class="space-y-4">
-                              <div>
-                                 <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                                 <input v-model="currentRecording.title"
-                                        @input="autoSave"
-                                        placeholder="Enter a title for this recording"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                             </div>
-                             <div>
-                                 <label class="block text-sm font-medium text-gray-700 mb-1">Participants</label>
-                                 <input v-model="currentRecording.participants"
-                                        @input="autoSave"
-                                        placeholder="e.g., John Doe, Jane Smith"
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                             </div>
-                             <div>
-                                 <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                                 <textarea v-model="currentRecording.notes"
-                                           @input="autoSave"
-                                           placeholder="Add any relevant notes here..."
-                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                                           rows="5"></textarea>
-                             </div>
-                              <div class="text-sm text-gray-500 pt-2">
-                                  <p>File Size: ${ formatFileSize(currentRecording.file_size) }</p>
-                                  <p>Created: ${ new Date(currentRecording.created_at).toLocaleString() }</p>
-                                  <p class="text-green-600 font-medium mt-2">Details are auto-saved.</p>
-                              </div>
-                         </div>
-                     </div>
-                 </div>
-             </div>
-
-        </main>
+             </main>
 
         <footer class="text-center py-4 mt-8 text-xs text-gray-400 border-t border-gray-200">
             Audio Transcription App &copy; ${ new Date().getFullYear() }
         </footer>
 
-        <div v-if="showEditModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-              <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                  <div class="flex justify-between items-center mb-4">
-                      <h3 class="text-xl font-semibold text-gray-800">Edit Recording Details</h3>
-                      <button @click="cancelEdit" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-                  </div>
-                 <div v-if="editingRecording" class="space-y-4">
+         <div v-if="showEditModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+             <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
+                 <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Edit Recording Details</h3>
+                    <button @click="cancelEdit" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                </div>
+                <div v-if="editingRecording" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input v-model="editingRecording.title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Participants</label>
+                        <input v-model="editingRecording.participants" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50">
+                    </div>
                      <div>
-                         <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                         <input v-model="editingRecording.title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50">
-                     </div>
-                     <div>
-                         <label class="block text-sm font-medium text-gray-700 mb-1">Participants</label>
-                         <input v-model="editingRecording.participants" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50">
-                     </div>
-                     <div>
-                         <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                         <textarea v-model="editingRecording.notes" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50" rows="4"></textarea>
-                     </div>
-                     <div class="flex justify-end space-x-3 pt-4">
-                          <button @click="cancelEdit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</button>
-                         <button @click="saveEdit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Changes</button>
-                     </div>
-                 </div>
-             </div>
-         </div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Summary</label>
+                        <textarea v-model="editingRecording.summary" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50" rows="5"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <textarea v-model="editingRecording.notes" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50" rows="4"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button @click="cancelEdit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</button>
+                        <button @click="saveEdit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
              <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Confirm Delete</h3>
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Confirm Delete</h3>
                  <p v-if="recordingToDelete" class="mb-2 text-gray-600">Are you sure you want to permanently delete the recording titled "<strong>${ recordingToDelete.title }</strong>"?</p>
-                 <p class="text-sm text-red-600 mb-6">This action cannot be undone and will delete both the record and the audio file.</p>
-                 <div class="flex justify-end space-x-3">
-                     <button @click="cancelDelete" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</button>
-                     <button @click="deleteRecording" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Delete Permanently</button>
-                 </div>
-             </div>
-         </div>
+                <p class="text-sm text-red-600 mb-6">This action cannot be undone and will delete the record, transcription, summary, and the audio file.</p>
+                <div class="flex justify-end space-x-3">
+                    <button @click="cancelDelete" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</button>
+                    <button @click="deleteRecording" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Delete Permanently</button>
+                </div>
+            </div>
+        </div>
 
-         <div v-if="uploadQueue.length > 0 || currentlyProcessingFile"
-              class="progress-popup bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
-              :class="{ 'minimized': progressPopupMinimized }">
+        <div v-if="uploadQueue.length > 0 || currentlyProcessingFile"
+             class="progress-popup bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
+             :class="{ 'minimized': progressPopupMinimized }">
 
-             <div class="flex justify-between items-center p-2 bg-gray-100 border-b border-gray-200 cursor-pointer" @click="progressPopupMinimized = !progressPopupMinimized">
-                 <h4 class="text-sm font-semibold text-gray-700">
-                     <i class="fas fa-upload mr-2 text-blue-500"></i>
-                     Upload Progress (${ completedInQueue }/${ totalInQueue } completed)
-                 </h4>
-                 <button class="text-gray-500 hover:text-gray-700">
-                     <i :class="progressPopupMinimized ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas fa-fw"></i>
-                 </button>
-             </div>
+            <div class="flex justify-between items-center p-2 bg-gray-100 border-b border-gray-200 cursor-pointer" @click="progressPopupMinimized = !progressPopupMinimized">
+                <h4 class="text-sm font-semibold text-gray-700">
+                    <i class="fas fa-upload mr-2 text-blue-500"></i>
+                    Upload & Process Progress (${ completedInQueue }/${ totalInQueue } completed)
+                </h4>
+                <button class="text-gray-500 hover:text-gray-700">
+                    <i :class="progressPopupMinimized ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas fa-fw"></i>
+                </button>
+            </div>
 
              <div class="p-3 max-h-60 overflow-y-auto custom-scrollbar" v-show="!progressPopupMinimized">
                  <div v-if="currentlyProcessingFile" class="mb-3 pb-3 border-b border-dashed border-gray-200">
                     <div class="flex items-center justify-between mb-1">
-                         <p class="text-xs font-medium text-gray-800 truncate mr-2" :title="currentlyProcessingFile.file.name">
-                             <i class="fas fa-spinner fa-spin text-blue-500 mr-1"></i> Processing: ${ currentlyProcessingFile.file.name }
-                         </p>
-                         <span class="text-xs text-gray-500 flex-shrink-0">${ formatFileSize(currentlyProcessingFile.file.size) }</span>
+                        <p class="text-xs font-medium text-gray-800 truncate mr-2" :title="currentlyProcessingFile.file.name">
+                            <i class="fas fa-spinner fa-spin text-blue-500 mr-1"></i> Processing: ${ currentlyProcessingFile.file.name }
+                        </p>
+                        <span class="text-xs text-gray-500 flex-shrink-0">${ formatFileSize(currentlyProcessingFile.file.size) }</span>
                     </div>
                      <p class="text-xs text-gray-600 mb-1 italic">${ processingMessage }</p>
-                     <div class="w-full bg-gray-200 rounded-full h-1.5">
+                    <div class="w-full bg-gray-200 rounded-full h-1.5">
                          <div class="bg-blue-500 h-1.5 rounded-full transition-all duration-300" :style="{ width: processingProgress + '%' }"></div>
-                     </div>
-                 </div>
+                    </div>
+                </div>
 
                  <div v-if="queuedFiles.length > 0" class="mb-2">
-                     <p class="text-xs font-semibold text-gray-500 mb-1">${ queuedFiles.length } file(s) queued:</p>
-                     <ul class="space-y-1">
-                         <li v-for="item in queuedFiles" :key="item.clientId" class="text-xs text-gray-600 progress-list-item">
-                              <i class="fas fa-clock text-gray-400 fa-fw"></i>
-                              <span class="truncate" :title="item.file.name">${ item.file.name }</span>
-                              <span class="text-gray-400 flex-shrink-0">${ formatFileSize(item.file.size) }</span>
-                         </li>
-                     </ul>
-                 </div>
+                    <p class="text-xs font-semibold text-gray-500 mb-1">${ queuedFiles.length } file(s) queued:</p>
+                    <ul class="space-y-1">
+                        <li v-for="item in queuedFiles" :key="item.clientId" class="text-xs text-gray-600 progress-list-item">
+                            <i class="fas fa-clock text-gray-400 fa-fw"></i>
+                            <span class="truncate" :title="item.file.name">${ item.file.name }</span>
+                            <span class="text-gray-400 flex-shrink-0">${ formatFileSize(item.file.size) }</span>
+                        </li>
+                    </ul>
+                </div>
 
-                 <div v-if="finishedFilesInQueue.length > 0" class="mt-2 pt-2 border-t border-dashed border-gray-200">
-                     <p class="text-xs font-semibold text-gray-500 mb-1">Recently finished:</p>
-                      <ul class="space-y-1">
+                <div v-if="finishedFilesInQueue.length > 0" class="mt-2 pt-2 border-t border-dashed border-gray-200">
+                    <p class="text-xs font-semibold text-gray-500 mb-1">Recently finished:</p>
+                    <ul class="space-y-1">
                          <li v-for="item in finishedFilesInQueue.slice(-5)" :key="item.clientId" class="text-xs progress-list-item">
                              <i v-if="item.status === 'completed'" class="fas fa-check-circle text-green-500 fa-fw"></i>
-                             <i v-else-if="item.status === 'failed'" class="fas fa-exclamation-triangle text-red-500 fa-fw"></i>
-                             <span class="truncate" :title="item.file.name">${ item.file.name }</span>
-                              <span v-if="item.status === 'failed'" class="text-red-500 text-xs italic flex-shrink-0">Failed</span>
-                              <span v-else class="text-gray-400 flex-shrink-0">${ formatFileSize(item.file.size) }</span>
-                         </li>
-                     </ul>
-                 </div>
+                            <i v-else-if="item.status === 'failed'" class="fas fa-exclamation-triangle text-red-500 fa-fw"></i>
+                             <i v-else class="fas fa-question-circle text-gray-400 fa-fw"></i>
+                            <span class="truncate" :title="item.file.name">${ item.file.name }</span>
+                             <span v-if="item.status === 'failed'" class="text-red-500 text-xs italic flex-shrink-0">Failed</span>
+                            <span v-else class="text-gray-400 flex-shrink-0">${ formatFileSize(item.file.size) }</span>
+                        </li>
+                    </ul>
+                </div>
 
-                  <div v-if="uploadQueue.length > 0 && queuedFiles.length === 0 && !currentlyProcessingFile" class="text-xs text-center text-gray-500 py-2">
-                     All uploads processed.
-                 </div>
-             </div>
-         </div>
+                 <div v-if="uploadQueue.length > 0 && queuedFiles.length === 0 && !currentlyProcessingFile" class="text-xs text-center text-gray-500 py-2">
+                    All uploads processed.
+                </div>
+            </div>
+        </div>
 
     </div> <script>
         const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue
 
         createApp({
             setup() {
-                const currentView = ref('gallery'); // Default view
+                const currentView = ref('gallery');
                 const dragover = ref(false);
-                const recordings = ref([]); // Gallery list
-                const selectedRecording = ref(null); // Gallery detail view
-                const currentRecording = ref(null); // Input view details (less used now)
+                const recordings = ref([]);
+                const selectedRecording = ref(null);
+                // const currentRecording = ref(null); // Less used now with modal editing
 
-                // --- NEW State for Multi-Upload ---
-                const uploadQueue = ref([]); // Array of { file: File, status: 'queued'|'uploading'|'processing'|'completed'|'failed', recordingId: null|int, clientId: string, error: null|string }
-                const currentlyProcessingFile = ref(null); // Reference to the item in uploadQueue currently being processed
-                const processingProgress = ref(0); // Progress of the *current* file (0-100)
-                const processingMessage = ref(''); // Status message for the *current* file
-                const isProcessingActive = ref(false); // Is the queue processor running?
+                // --- Multi-Upload State ---
+                // Status: 'queued'|'uploading'|'processing'|'summarizing'|'completed'|'failed'
+                const uploadQueue = ref([]);
+                const currentlyProcessingFile = ref(null);
+                const processingProgress = ref(0);
+                const processingMessage = ref('');
+                const isProcessingActive = ref(false);
                 const pollInterval = ref(null);
-                const progressPopupMinimized = ref(false); // State for the popup view
-                // -----------------------------------
+                const progressPopupMinimized = ref(false);
 
                 const showEditModal = ref(false);
                 const showDeleteModal = ref(false);
-                const editingRecording = ref(null);
+                const editingRecording = ref(null); // Holds a *copy* for the modal
                 const recordingToDelete = ref(null);
-                const autoSaveTimeout = ref(null);
+                // const autoSaveTimeout = ref(null); // Autosave not implemented for modal
                 const isLoadingRecordings = ref(true);
                 const globalError = ref(null);
-                const maxFileSizeMB = ref(250); // Set your max file size here
+                const maxFileSizeMB = ref(250); // Default, could fetch from config if needed
 
                 // --- Computed Properties ---
                 const groupedRecordings = computed(() => {
-                     // Sort recordings newest first before grouping
                     const sortedRecordings = [...recordings.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
+                    // Grouping logic (same as before)...
                     const groups = { today: [], yesterday: [], thisWeek: [], older: [] };
                     const now = new Date();
                     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                     const yesterdayStart = new Date(todayStart);
                     yesterdayStart.setDate(todayStart.getDate() - 1);
-                    const currentDayOfWeek = now.getDay(); // 0 = Sunday
-                    const daysToSubtract = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Assuming Monday is start
+                    const currentDayOfWeek = now.getDay();
+                    const daysToSubtract = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
                     const weekStart = new Date(todayStart);
                     weekStart.setDate(todayStart.getDate() - daysToSubtract);
 
                     sortedRecordings.forEach(r => {
-                        const date = new Date(r.created_at);
+                         const date = new Date(r.created_at);
                         if (date >= todayStart) groups.today.push(r);
                         else if (date >= yesterdayStart) groups.yesterday.push(r);
                         else if (date >= weekStart) groups.thisWeek.push(r);
                         else groups.older.push(r);
                     });
-
-                    return [
+                     return [
                         { title: 'Today', items: groups.today },
                         { title: 'Yesterday', items: groups.yesterday },
                         { title: 'This Week', items: groups.thisWeek },
@@ -449,34 +419,51 @@
                     ].filter(g => g.items.length > 0);
                 });
 
-                // Computed properties for the progress popup
                  const totalInQueue = computed(() => uploadQueue.value.length);
-                 const completedInQueue = computed(() => uploadQueue.value.filter(item => item.status === 'completed' || item.status === 'failed').length);
-                 const queuedFiles = computed(() => uploadQueue.value.filter(item => item.status === 'queued'));
-                 const finishedFilesInQueue = computed(() => uploadQueue.value.filter(item => item.status === 'completed' || item.status === 'failed'));
+                const completedInQueue = computed(() => uploadQueue.value.filter(item => item.status === 'completed' || item.status === 'failed').length);
+                const queuedFiles = computed(() => uploadQueue.value.filter(item => item.status === 'queued'));
+                // Filter finished: includes completed and failed
+                 const finishedFilesInQueue = computed(() => uploadQueue.value.filter(item => ['completed', 'failed'].includes(item.status)));
 
 
                 // --- Methods ---
                 const setGlobalError = (message, duration = 7000) => {
-                    globalError.value = message;
+                     globalError.value = message;
                      if (duration > 0) {
-                         setTimeout(() => { if (globalError.value === message) globalError.value = null; }, duration);
-                     }
+                        setTimeout(() => { if (globalError.value === message) globalError.value = null; }, duration);
+                    }
                 };
 
-                const formatFileSize = (bytes) => {
-                    if (bytes == null || bytes === 0) return '0 Bytes';
+                 const formatFileSize = (bytes) => {
+                     if (bytes == null || bytes === 0) return '0 Bytes';
                     const k = 1024;
                     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
                      if (bytes < 0) bytes = 0;
-                     // Ensure i is non-negative even for 0 bytes input
-                     const i = bytes === 0 ? 0 : Math.max(0, Math.floor(Math.log(bytes) / Math.log(k)));
-                     // Avoid NaN for 0 bytes by checking i before division
+                    const i = bytes === 0 ? 0 : Math.max(0, Math.floor(Math.log(bytes) / Math.log(k)));
                      const size = i === 0 ? bytes : parseFloat((bytes / Math.pow(k, i)).toFixed(2));
-                     return size + ' ' + sizes[i];
+                    return size + ' ' + sizes[i];
                 };
 
-                // Reset state specific to the processing of a single file
+                // Helper for status display
+                 const formatStatus = (status) => {
+                     if (!status) return 'Unknown';
+                     // Capitalize first letter, handle 'SUMMARIZING' specifically
+                     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+                };
+
+                // Helper for status badge class
+                const getStatusClass = (status) => {
+                    switch(status) {
+                        case 'PENDING': return 'status-pending';
+                        case 'PROCESSING': return 'status-processing';
+                        case 'SUMMARIZING': return 'status-summarizing';
+                        case 'COMPLETED': return 'status-completed';
+                        case 'FAILED': return 'status-failed';
+                        default: return 'status-pending'; // Default or unknown
+                    }
+                };
+
+
                 const resetCurrentFileProcessingState = () => {
                     if (pollInterval.value) clearInterval(pollInterval.value);
                     pollInterval.value = null;
@@ -485,194 +472,187 @@
                     processingMessage.value = '';
                 };
 
-                 const switchToUploadView = () => {
-                    // Don't reset processing state here, queue might be active
+                const switchToUploadView = () => {
                     currentView.value = 'upload';
                     selectedRecording.value = null;
-                    currentRecording.value = null; // Clear input view data
-                };
+                 };
 
                 const switchToGalleryView = async () => {
-                     // Don't reset processing state
                     currentView.value = 'gallery';
-                    // selectedRecording.value = null; // Keep selection? Optional.
-                    // currentRecording.value = null;
-                    await loadRecordings(); // Refresh recordings
+                     await loadRecordings(); // Refresh recordings when switching back
                 };
 
-                // --- Drag and Drop Handlers ---
                 const handleDragLeave = (e) => {
-                    // Prevent dragleave flicker when moving over child elements
                     if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) {
                          return;
-                     }
+                    }
                     dragover.value = false;
                 }
 
                 const handleDrop = (e) => {
                     dragover.value = false;
                     addFilesToQueue(e.dataTransfer.files);
-                    // Optionally switch view or just let the popup handle it
-                    // if (currentView.value !== 'gallery') {
-                    //     switchToGalleryView();
-                    // }
-                };
+                 };
 
                 const handleFileSelect = (e) => {
                     addFilesToQueue(e.target.files);
                     e.target.value = null; // Reset input
-                     // Optionally switch view
-                     // if (currentView.value !== 'gallery') {
-                     //     switchToGalleryView();
-                     // }
                 };
 
                 // --- Queue Management ---
                 const addFilesToQueue = (files) => {
                     let filesAdded = 0;
                     for (const file of files) {
-                         if (file && file.type.startsWith('audio/')) {
-                             // Check file size client-side
-                            if (file.size > maxFileSizeMB.value * 1024 * 1024) {
+                        if (file && file.type.startsWith('audio/')) {
+                             if (file.size > maxFileSizeMB.value * 1024 * 1024) {
                                 setGlobalError(`File "${file.name}" exceeds the maximum size of ${maxFileSizeMB.value} MB and was skipped.`);
-                                continue; // Skip this file
+                                continue;
                             }
                              const clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                             uploadQueue.value.push({
-                                file: file,
-                                status: 'queued',
-                                recordingId: null,
-                                clientId: clientId,
-                                error: null
+                            uploadQueue.value.push({
+                                file: file, status: 'queued', recordingId: null, clientId: clientId, error: null
                             });
                             filesAdded++;
-                         } else if (file) {
-                             setGlobalError(`Invalid file type "${file.name}". Only audio files are accepted. File skipped.`);
-                         }
+                        } else if (file) {
+                            setGlobalError(`Invalid file type "${file.name}". Only audio files are accepted. File skipped.`);
+                        }
                     }
-                    if(filesAdded > 0) {
+                     if(filesAdded > 0) {
                         console.log(`Added ${filesAdded} file(s) to the queue.`);
-                        progressPopupMinimized.value = false; // Show popup when files are added
-                        // Start processing if not already active
+                        progressPopupMinimized.value = false; // Show popup
                         if (!isProcessingActive.value) {
-                             startProcessingQueue();
-                         }
+                            startProcessingQueue();
+                        }
                     }
                 };
 
                  const startProcessingQueue = async () => {
-                     console.log("Attempting to start processing queue...");
-                     if (isProcessingActive.value) {
-                         console.log("Queue processor already active.");
-                         return; // Already processing
-                     }
+                    console.log("Attempting to start processing queue...");
+                    if (isProcessingActive.value) {
+                        console.log("Queue processor already active.");
+                        return;
+                    }
 
-                     isProcessingActive.value = true;
-                     resetCurrentFileProcessingState(); // Clear state from any previous file
+                    isProcessingActive.value = true;
+                    resetCurrentFileProcessingState();
 
                      const nextFileItem = uploadQueue.value.find(item => item.status === 'queued');
 
-                     if (nextFileItem) {
-                         console.log(`Processing next file: ${nextFileItem.file.name}`);
-                         currentlyProcessingFile.value = nextFileItem; // Set the reference
-                         nextFileItem.status = 'uploading';
-                         processingMessage.value = 'Preparing upload...';
-                         processingProgress.value = 5;
+                    if (nextFileItem) {
+                        console.log(`Processing next file: ${nextFileItem.file.name} (Client ID: ${nextFileItem.clientId})`);
+                        currentlyProcessingFile.value = nextFileItem;
+                        nextFileItem.status = 'uploading';
+                        processingMessage.value = 'Preparing upload...';
+                        processingProgress.value = 5;
 
-                         try {
-                             const formData = new FormData();
-                             formData.append('file', nextFileItem.file);
+                        try {
+                            const formData = new FormData();
+                            formData.append('file', nextFileItem.file);
 
-                             processingMessage.value = 'Uploading file...';
-                             processingProgress.value = 10;
+                            processingMessage.value = 'Uploading file...';
+                            processingProgress.value = 10;
 
-                             const response = await fetch('/upload', { method: 'POST', body: formData });
-                             const data = await response.json();
+                            const response = await fetch('/upload', { method: 'POST', body: formData });
+                            const data = await response.json();
 
-                             if (!response.ok) {
-                                 let errorMsg = data.error || `Upload failed with status ${response.status}`;
-                                 if (response.status === 413) {
-                                     errorMsg = data.error || `File too large. Maximum size: ${data.max_size_mb?.toFixed(0) || maxFileSizeMB.value} MB.`;
-                                 }
-                                 throw new Error(errorMsg);
-                             }
+                            if (!response.ok) {
+                                let errorMsg = data.error || `Upload failed with status ${response.status}`;
+                                if (response.status === 413) errorMsg = data.error || `File too large. Max: ${data.max_size_mb?.toFixed(0) || maxFileSizeMB.value} MB.`;
+                                throw new Error(errorMsg);
+                            }
 
                              if (response.status === 202 && data.id) {
-                                 console.log(`File ${nextFileItem.file.name} uploaded. Recording ID: ${data.id}. Starting transcription poll.`);
-                                 nextFileItem.status = 'processing';
-                                 nextFileItem.recordingId = data.id;
-                                 processingMessage.value = 'Upload complete. Starting transcription...';
-                                 processingProgress.value = 30;
+                                console.log(`File ${nextFileItem.file.name} uploaded. Recording ID: ${data.id}. Starting status poll.`);
+                                // Status is now 'PENDING' on backend, will be updated by poll
+                                nextFileItem.status = 'pending'; // Reflect initial backend status
+                                nextFileItem.recordingId = data.id;
+                                processingMessage.value = 'Upload complete. Waiting for processing...';
+                                processingProgress.value = 30;
 
                                  // Add preliminary record to gallery immediately
-                                 recordings.value.unshift(data);
-                                 if (!selectedRecording.value) {
-                                     // Optionally select the new item if nothing is selected
-                                     // selectRecording(data);
-                                 }
+                                recordings.value.unshift(data);
+                                // Optionally select the new item
+                                // selectRecording(data);
 
-                                 // Start polling for this specific file
-                                 pollProcessingStatus(nextFileItem);
+                                pollProcessingStatus(nextFileItem); // Start polling
 
+                            } else {
+                                throw new Error('Unexpected success response from server after upload.');
+                            }
+
+                        } catch (error) {
+                            console.error(`Upload/Processing Error for ${nextFileItem.file.name} (Client ID: ${nextFileItem.clientId}):`, error);
+                            nextFileItem.status = 'failed';
+                            nextFileItem.error = error.message;
+                             // Find the potentially added preliminary record and mark it failed
+                             const failedRecordIndex = recordings.value.findIndex(r => r.id === nextFileItem.recordingId);
+                             if(failedRecordIndex !== -1) {
+                                recordings.value[failedRecordIndex].status = 'FAILED';
+                                recordings.value[failedRecordIndex].transcription = `Upload/Processing failed: ${error.message}`;
                              } else {
-                                 throw new Error('Unexpected success response from server after upload.');
+                                // If record wasn't even created, add a note
+                                setGlobalError(`Failed to process "${nextFileItem.file.name}": ${error.message}`);
                              }
 
-                         } catch (error) {
-                             console.error(`Upload/Processing Error for ${nextFileItem.file.name}:`, error);
-                             nextFileItem.status = 'failed';
-                             nextFileItem.error = error.message;
-                             setGlobalError(`Failed to process "${nextFileItem.file.name}": ${error.message}`);
-                             // Reset state and immediately try the next file
+                             // Reset state and try next file
                              resetCurrentFileProcessingState();
-                             isProcessingActive.value = false; // Allow the processor to restart
-                             await nextTick(); // Ensure state updates before recursing
-                             startProcessingQueue(); // Try next file
+                             isProcessingActive.value = false;
+                             await nextTick();
+                             startProcessingQueue();
                          }
-                     } else {
-                         console.log("Upload queue is empty or no files are queued.");
-                         isProcessingActive.value = false; // No more files to process
-                         // Optional: Auto-minimize popup after a delay when queue finishes
+                    } else {
+                        console.log("Upload queue is empty or no files are queued.");
+                        isProcessingActive.value = false;
+                        // Optional: Auto-minimize popup after a delay
                          // setTimeout(() => {
-                         //     if (uploadQueue.value.every(f => f.status === 'completed' || f.status === 'failed')) {
-                         //          progressPopupMinimized.value = true;
-                         //     }
+                        //     if (!isProcessingActive.value && uploadQueue.value.every(f => ['completed', 'failed'].includes(f.status))) {
+                         //         progressPopupMinimized.value = true;
+                        //     }
                          // }, 5000);
-                     }
-                 };
-
+                    }
+                };
 
                 const pollProcessingStatus = (fileItem) => {
-                     if (pollInterval.value) clearInterval(pollInterval.value); // Clear existing before starting new
+                     if (pollInterval.value) clearInterval(pollInterval.value);
 
                     const recordingId = fileItem.recordingId;
                     if (!recordingId) {
                         console.error("Cannot poll status without recording ID for", fileItem.file.name);
-                         fileItem.status = 'failed';
-                         fileItem.error = 'Internal error: Missing recording ID for polling.';
-                         resetCurrentFileProcessingState();
-                         isProcessingActive.value = false;
-                         nextTick(startProcessingQueue); // Try next file
+                        fileItem.status = 'failed';
+                        fileItem.error = 'Internal error: Missing recording ID for polling.';
+                        resetCurrentFileProcessingState();
+                        isProcessingActive.value = false;
+                        nextTick(startProcessingQueue); // Try next file
                         return;
                     }
 
-                    processingMessage.value = 'Transcription queued...';
+                    // Initial message based on fileItem status (should be 'pending' initially)
+                    processingMessage.value = 'Waiting for transcription...';
                     processingProgress.value = 40;
 
                     pollInterval.value = setInterval(async () => {
-                        if (fileItem.status !== 'processing') {
-                            // If status changed elsewhere (e.g., user cancelled), stop polling
+                        // Check if the item is still the one being processed and hasn't finished/failed
+                         if (!currentlyProcessingFile.value || currentlyProcessingFile.value.clientId !== fileItem.clientId || ['completed', 'failed'].includes(fileItem.status)) {
+                             console.log(`Polling stopped for ${fileItem.clientId} as it's no longer active or finished.`);
                             clearInterval(pollInterval.value);
                             pollInterval.value = null;
+                             // If this was the active file, allow queue to restart
+                            if (currentlyProcessingFile.value && currentlyProcessingFile.value.clientId === fileItem.clientId) {
+                                resetCurrentFileProcessingState();
+                                isProcessingActive.value = false;
+                                await nextTick();
+                                startProcessingQueue();
+                            }
                             return;
                         }
+
                         try {
                             console.log(`Polling status for recording ID: ${recordingId} (${fileItem.file.name})`);
                             const response = await fetch(`/status/${recordingId}`);
                             if (!response.ok) throw new Error(`Status check failed with status ${response.status}`);
 
                             const data = await response.json();
-                            const galleryIndex = recordings.value.findIndex(r => r.id === recordingId);
+                             const galleryIndex = recordings.value.findIndex(r => r.id === recordingId);
 
                             // Update item in the main recordings list
                             if (galleryIndex !== -1) {
@@ -682,64 +662,73 @@
                                 }
                             }
 
+                            // Update the status in the uploadQueue item as well
+                            fileItem.status = data.status;
+
+                            // Update progress display based on backend status
                             if (data.status === 'COMPLETED') {
-                                console.log(`Transcription COMPLETED for ${fileItem.file.name} (ID: ${recordingId})`);
-                                processingMessage.value = 'Transcription complete!';
+                                console.log(`Processing COMPLETED for ${fileItem.file.name} (ID: ${recordingId})`);
+                                processingMessage.value = 'Processing complete!';
                                 processingProgress.value = 100;
-                                fileItem.status = 'completed';
-                                // Clear polling and processing state for this file
+                                fileItem.status = 'completed'; // Final status for queue item
+                                // Stop polling, reset state, and trigger next item
+                                clearInterval(pollInterval.value);
+                                pollInterval.value = null;
                                 resetCurrentFileProcessingState();
-                                isProcessingActive.value = false; // Allow processor to check for next file
+                                isProcessingActive.value = false;
                                 await nextTick();
-                                startProcessingQueue(); // Process the next file in the queue
+                                startProcessingQueue();
 
                             } else if (data.status === 'FAILED') {
-                                console.log(`Transcription FAILED for ${fileItem.file.name} (ID: ${recordingId})`);
-                                processingMessage.value = 'Transcription failed.';
-                                processingProgress.value = 100; // Show progress done, but failed state
-                                fileItem.status = 'failed';
-                                fileItem.error = data.transcription || 'Transcription failed on server.';
-                                setGlobalError(`Transcription failed for "${data.title || fileItem.file.name}".`);
-                                // Clear polling and processing state for this file
+                                console.log(`Processing FAILED for ${fileItem.file.name} (ID: ${recordingId})`);
+                                processingMessage.value = 'Processing failed.';
+                                processingProgress.value = 100; // Show 100% but failed state
+                                fileItem.status = 'failed'; // Final status for queue item
+                                fileItem.error = data.transcription || data.summary || 'Processing failed on server.';
+                                setGlobalError(`Processing failed for "${data.title || fileItem.file.name}".`);
+                                // Stop polling, reset state, and trigger next item
+                                clearInterval(pollInterval.value);
+                                pollInterval.value = null;
                                 resetCurrentFileProcessingState();
-                                isProcessingActive.value = false; // Allow processor to check for next file
+                                isProcessingActive.value = false;
                                 await nextTick();
-                                startProcessingQueue(); // Process the next file in the queue
+                                startProcessingQueue();
 
                             } else if (data.status === 'PROCESSING') {
                                 processingMessage.value = 'Transcription in progress...';
-                                // Simulate some progress visually, as backend doesn't give percentage
-                                processingProgress.value = Math.min(95, processingProgress.value + Math.random() * 5);
+                                processingProgress.value = Math.min(65, processingProgress.value + Math.random() * 5); // Mid-range progress
+                            } else if (data.status === 'SUMMARIZING') {
+                                processingMessage.value = 'Generating title & summary...';
+                                processingProgress.value = Math.min(95, processingProgress.value + Math.random() * 5); // Higher progress
                             } else { // PENDING
-                                processingMessage.value = 'Waiting for transcription to start...';
+                                processingMessage.value = 'Waiting in queue...';
                                 processingProgress.value = 45; // Keep progress indication while pending
                             }
                         } catch (error) {
                             console.error(`Polling Error for ${fileItem.file.name} (ID: ${recordingId}):`, error);
+                             // Assume failed if polling error occurs
                             fileItem.status = 'failed';
                             fileItem.error = `Error checking status: ${error.message}`;
-                             setGlobalError(`Error checking status for "${fileItem.file.name}": ${error.message}.`);
+                            setGlobalError(`Error checking status for "${fileItem.file.name}": ${error.message}.`);
+                             // Update record in gallery if found
+                             const galleryIndex = recordings.value.findIndex(r => r.id === recordingId);
+                            if (galleryIndex !== -1) recordings.value[galleryIndex].status = 'FAILED';
+
+                            clearInterval(pollInterval.value);
+                            pollInterval.value = null;
                             resetCurrentFileProcessingState();
-                            isProcessingActive.value = false; // Allow processor to check for next file
-                             await nextTick();
-                            startProcessingQueue(); // Process the next file in the queue
+                            isProcessingActive.value = false;
+                            await nextTick();
+                            startProcessingQueue(); // Process the next file
                         }
-                    }, 4000); // Poll every 4 seconds
+                    }, 5000); // Poll every 5 seconds (adjust as needed)
                 };
 
-                // --- Gallery and Detail Methods (Largely Unchanged) ---
-                const autoSave = () => {
-                    clearTimeout(autoSaveTimeout.value);
-                    autoSaveTimeout.value = setTimeout(() => {
-                        // Save applies to currently selected gallery item OR the 'input' view item
-                        const itemToSave = currentView.value === 'input' ? currentRecording.value : selectedRecording.value;
-                        if (itemToSave) {
-                            saveMetadata(itemToSave);
-                        }
-                    }, 1200);
-                };
+                // --- Gallery and Detail Methods ---
+                // AutoSave removed in favor of explicit save in modal
+                // const autoSave = () => { ... };
 
-                const saveMetadata = async (recordingDataToSave) => {
+                 const saveMetadata = async (recordingDataToSave) => {
                     globalError.value = null;
                     if (!recordingDataToSave || !recordingDataToSave.id) return null;
                     console.log('Saving metadata for:', recordingDataToSave.id);
@@ -748,7 +737,8 @@
                             id: recordingDataToSave.id,
                             title: recordingDataToSave.title,
                             participants: recordingDataToSave.participants,
-                            notes: recordingDataToSave.notes
+                            notes: recordingDataToSave.notes,
+                            summary: recordingDataToSave.summary // <-- ADDED: Include summary
                         };
                         const response = await fetch('/save', {
                             method: 'POST',
@@ -762,18 +752,20 @@
                         // Update the master recordings list
                         const index = recordings.value.findIndex(r => r.id === data.recording.id);
                         if (index !== -1) {
-                            // Update only the fields that were saved, preserve others like status/transcription
-                             recordings.value[index] = { ...recordings.value[index], ...payload };
-                        }
-                         // Update selected if it's the one being saved
-                        if (selectedRecording.value?.id === data.recording.id) {
-                             selectedRecording.value = { ...selectedRecording.value, ...payload };
-                        }
-                         // Update input view model if it's the one being saved
-                         if (currentRecording.value?.id === data.recording.id) {
-                             currentRecording.value = { ...currentRecording.value, ...payload };
+                            // Update only the editable fields, preserve others like status/transcription from backend
+                             recordings.value[index].title = payload.title;
+                             recordings.value[index].participants = payload.participants;
+                             recordings.value[index].notes = payload.notes;
+                             recordings.value[index].summary = payload.summary;
                          }
-                        return data.recording;
+                         // Update selected if it's the one being saved
+                         if (selectedRecording.value?.id === data.recording.id) {
+                            selectedRecording.value.title = payload.title;
+                            selectedRecording.value.participants = payload.participants;
+                            selectedRecording.value.notes = payload.notes;
+                            selectedRecording.value.summary = payload.summary;
+                         }
+                        return data.recording; // Return the full updated object from backend
                     } catch (error) {
                         console.error('Save Metadata Error:', error);
                         setGlobalError(`Save failed: ${error.message}`);
@@ -782,7 +774,7 @@
                 };
 
                 const loadRecordings = async () => {
-                    globalError.value = null;
+                     globalError.value = null;
                     isLoadingRecordings.value = true;
                     try {
                         const response = await fetch('/recordings');
@@ -790,35 +782,54 @@
                         if (!response.ok) throw new Error(data.error || 'Failed to load recordings');
                         recordings.value = data;
 
-                         // Check for recordings stuck in processing state on load
-                         // This is less critical now as the queue handles restarts, but keep as fallback
-                         const processingOrPending = recordings.value.find(r => (r.status === 'PENDING' || r.status === 'PROCESSING'));
-                         if (processingOrPending && !isProcessingActive.value) {
-                            // Find the corresponding item in uploadQueue if it exists (unlikely on reload)
-                             let queueItem = uploadQueue.value.find(item => item.recordingId === processingOrPending.id);
-                             if (!queueItem) {
-                                // If not in queue (likely page reload), create a placeholder to track polling
-                                 console.warn(`Found processing recording ${processingOrPending.id} on load, not in queue. Re-attaching poll.`);
-                                 queueItem = {
-                                     file: { name: processingOrPending.title, size: processingOrPending.file_size }, // Mock file object
-                                     status: processingOrPending.status,
-                                     recordingId: processingOrPending.id,
-                                     clientId: `reload-${processingOrPending.id}`,
-                                     error: null
-                                 };
-                                 // Don't add to visual queue, just use for polling logic
-                                  currentlyProcessingFile.value = queueItem; // Track it
-                                  isProcessingActive.value = true; // Mark as active
-                                  pollProcessingStatus(queueItem);
-                             } else if(queueItem.status === 'queued' || queueItem.status === 'uploading') {
-                                 // If it's somehow in the queue but backend says processing, update queue state
-                                 console.log(`Correcting queue status for ${queueItem.clientId} based on loaded data`);
-                                 queueItem.status = processingOrPending.status; // 'processing' or 'pending'
-                                 queueItem.recordingId = processingOrPending.id;
-                                  if (!isProcessingActive.value) { // Start processing if needed
-                                       startProcessingQueue();
-                                   }
-                             }
+                         // On load, check for any recordings stuck in PENDING, PROCESSING, or SUMMARIZING
+                         // and ensure polling is active if the queue processor isn't running.
+                         const incompleteRecordings = recordings.value.filter(r => ['PENDING', 'PROCESSING', 'SUMMARIZING'].includes(r.status));
+
+                         if (incompleteRecordings.length > 0 && !isProcessingActive.value) {
+                             console.warn(`Found ${incompleteRecordings.length} incomplete recording(s) on load. Attempting to resume polling if not already queued.`);
+                             for (const recording of incompleteRecordings) {
+                                 // Is this item already being tracked in the queue?
+                                 let queueItem = uploadQueue.value.find(item => item.recordingId === recording.id);
+                                if (!queueItem) {
+                                    // If not in queue (likely page reload), create a placeholder to track polling
+                                    console.log(`Re-attaching poll for recording ${recording.id}.`);
+                                    queueItem = {
+                                        // Mock file object, size might be useful for display
+                                        file: { name: recording.title || `Recording ${recording.id}`, size: recording.file_size },
+                                        status: recording.status, // Use current status from DB
+                                        recordingId: recording.id,
+                                        clientId: `reload-${recording.id}`, // Unique ID for tracking
+                                        error: null
+                                    };
+                                    // Add to the *beginning* of the visual queue *if* we want to show it there
+                                    // Or just manage polling without adding to queue visually?
+                                    // Let's add it to the queue for consistency in management.
+                                    uploadQueue.value.unshift(queueItem);
+                                     // Start processing queue if it wasn't active
+                                     if (!isProcessingActive.value) {
+                                         startProcessingQueue();
+                                     } else if (currentlyProcessingFile.value?.recordingId !== recording.id) {
+                                         // If processor is active but on a different file, just ensure polling starts
+                                         // Note: startProcessingQueue handles finding the next 'queued'. This item
+                                         // might not be 'queued'. We need direct polling.
+                                         // Let's rethink: The queue processor should handle finding PENDING/PROCESSING items.
+                                         // For simplicity, let's just trigger the queue processor. It will find this item if it's next.
+                                         // If something else is truly processing, this won't interrupt.
+                                         console.log("Triggering queue processor check due to reloaded incomplete item.")
+                                         // Ensure it's marked conceptually 'queued' for the processor to pick up
+                                         queueItem.status = 'queued';
+                                         startProcessingQueue(); // Let the queue logic handle it
+                                     }
+
+                                } else if (queueItem.status !== recording.status && !['completed', 'failed'].includes(queueItem.status)) {
+                                    // If queue status differs from DB, update queue status
+                                     console.log(`Correcting queue status for ${queueItem.clientId} from ${queueItem.status} to ${recording.status}`);
+                                     queueItem.status = recording.status;
+                                     // Restart queue processing if needed
+                                     if (!isProcessingActive.value) startProcessingQueue();
+                                 }
+                            }
                          }
 
                     } catch (error) {
@@ -826,28 +837,19 @@
                         setGlobalError(`Failed to load recordings: ${error.message}`);
                         recordings.value = [];
                     } finally {
-                         isLoadingRecordings.value = false;
+                        isLoadingRecordings.value = false;
                     }
                 };
 
-                const selectRecording = (recording) => {
+                 const selectRecording = (recording) => {
                      selectedRecording.value = recording;
-                     // If the selected item is still processing according to gallery data,
-                     // ensure polling is active for it if needed (usually handled by queue)
-                     if((recording.status === 'PENDING' || recording.status === 'PROCESSING') && !currentlyProcessingFile.value && !isProcessingActive.value) {
-                         console.warn("Selected a processing item, but queue isn't active. Attempting to resume poll.");
-                         let queueItem = uploadQueue.value.find(item => item.recordingId === recording.id);
-                          if (!queueItem) {
-                              queueItem = { file: { name: recording.title, size: recording.file_size }, status: recording.status, recordingId: recording.id, clientId: `select-${recording.id}`, error: null };
-                              currentlyProcessingFile.value = queueItem;
-                              isProcessingActive.value = true;
-                              pollProcessingStatus(queueItem);
-                          }
-                     }
-                };
+                     // Optional: Check if polling needs to be restarted if user selects an incomplete item
+                     // This logic is complex and might be redundant with the loadRecordings check.
+                     // Let's rely on loadRecordings and the queue processor for robustness.
+                 };
 
                 const editRecording = (recording) => {
-                    // Create a deep copy for editing to avoid modifying original reactive object directly
+                     // Create a deep copy for the modal to prevent modifying original object directly
                     editingRecording.value = JSON.parse(JSON.stringify(recording));
                     showEditModal.value = true;
                 };
@@ -857,14 +859,14 @@
                     editingRecording.value = null;
                 };
 
-                const saveEdit = async () => {
-                     // Save using the saveMetadata function which updates the main list
-                    const updatedRecordingData = await saveMetadata(editingRecording.value);
-                     if (updatedRecordingData) {
-                         cancelEdit(); // Close modal on success
+                 const saveEdit = async () => {
+                    // Save using the saveMetadata function which updates the main list & selected item
+                     const success = await saveMetadata(editingRecording.value);
+                    if (success) {
+                        cancelEdit(); // Close modal on success
                      }
                      // Keep modal open on failure, error shown via globalError
-                 };
+                };
 
                 const confirmDelete = (recording) => {
                     recordingToDelete.value = recording;
@@ -880,56 +882,61 @@
                     globalError.value = null;
                     if (!recordingToDelete.value) return;
                     const idToDelete = recordingToDelete.value.id;
+                    const titleToDelete = recordingToDelete.value.title; // For logging/messaging
                     try {
                         const response = await fetch(`/recording/${idToDelete}`, { method: 'DELETE' });
                         const data = await response.json();
                         if (!response.ok) throw new Error(data.error || 'Failed to delete recording');
 
-                        // Remove from gallery list
+                         // Remove from gallery list
                         recordings.value = recordings.value.filter(r => r.id !== idToDelete);
-                        // Remove from upload queue if it exists there
-                        uploadQueue.value = uploadQueue.value.filter(item => item.recordingId !== idToDelete);
+
+                        // Find and remove from upload queue
+                        const queueIndex = uploadQueue.value.findIndex(item => item.recordingId === idToDelete);
+                         if (queueIndex !== -1) {
+                            const deletedItem = uploadQueue.value.splice(queueIndex, 1)[0];
+                             console.log(`Removed item ${deletedItem.clientId} from queue.`);
+                             // If deleting the file currently being processed, stop polling and move to next
+                            if (currentlyProcessingFile.value?.clientId === deletedItem.clientId) {
+                                console.log(`Deleting currently processing file: ${titleToDelete}. Stopping poll and moving to next.`);
+                                clearInterval(pollInterval.value); // Stop polling explicitly
+                                pollInterval.value = null;
+                                resetCurrentFileProcessingState();
+                                isProcessingActive.value = false; // Allow queue to restart
+                                await nextTick();
+                                startProcessingQueue();
+                            }
+                        }
 
                         if (selectedRecording.value?.id === idToDelete) selectedRecording.value = null;
-                        if (currentRecording.value?.id === idToDelete) currentRecording.value = null;
-                         if (currentlyProcessingFile.value?.recordingId === idToDelete) {
-                             // If deleting the file currently being processed, stop polling and move to next
-                             console.log("Deleting currently processing file. Stopping poll and moving to next.");
-                             resetCurrentFileProcessingState();
-                             isProcessingActive.value = false;
-                             await nextTick();
-                             startProcessingQueue();
-                         }
                         cancelDelete();
+                        console.log(`Successfully deleted recording ${idToDelete} (${titleToDelete})`);
+
                     } catch (error) {
                         console.error('Delete Error:', error);
-                        setGlobalError(`Failed to delete recording: ${error.message}`);
+                        setGlobalError(`Failed to delete recording "${titleToDelete}": ${error.message}`);
                         cancelDelete(); // Still close modal on error
                     }
                 };
 
-
                 // --- Lifecycle Hooks ---
                 onMounted(() => {
                     loadRecordings();
-                    // fetch('/config').then(res => res.json()).then(cfg => maxFileSizeMB.value = cfg.max_size_mb);
                 });
 
                 // --- Watchers ---
                  watch(uploadQueue, (newQueue, oldQueue) => {
-                    // If the queue becomes empty, potentially hide or minimize the popup after a delay
-                    if (newQueue.length === 0 && oldQueue.length > 0) {
-                        console.log("Upload queue is now empty.");
-                        isProcessingActive.value = false; // Ensure processor stops
-                        // Maybe auto-minimize after a short delay
-                        // setTimeout(() => progressPopupMinimized.value = true, 3000);
-                    }
-                 }, { deep: true }); // Deep watch needed to detect status changes within items
+                    if (newQueue.length === 0 && oldQueue.length > 0 && !isProcessingActive.value) {
+                        console.log("Upload queue processing finished.");
+                        // Optional: Auto-minimize after delay
+                         // setTimeout(() => progressPopupMinimized.value = true, 3000);
+                     }
+                 }, { deep: true });
 
 
                 return {
                     // State
-                    currentView, dragover, recordings, selectedRecording, currentRecording,
+                    currentView, dragover, recordings, selectedRecording, // currentRecording removed
                     showEditModal, showDeleteModal, editingRecording, recordingToDelete,
                     isLoadingRecordings, globalError, maxFileSizeMB,
                     // Multi-upload State
@@ -938,15 +945,13 @@
                     // Computed
                     groupedRecordings, totalInQueue, completedInQueue, queuedFiles, finishedFilesInQueue,
                     // Methods
-                    handleDrop, handleFileSelect, autoSave, loadRecordings,
+                    handleDrop, handleFileSelect, /*autoSave removed*/ loadRecordings,
                     selectRecording, editRecording, cancelEdit, saveEdit, confirmDelete,
                     cancelDelete, deleteRecording, switchToUploadView, switchToGalleryView,
-                    formatFileSize, setGlobalError, handleDragLeave,
-                    // Queue Methods (exposed if needed, but mainly internal)
-                    // addFilesToQueue, startProcessingQueue, pollProcessingStatus
-                }
+                    formatFileSize, setGlobalError, handleDragLeave, formatStatus, getStatusClass,
+                 }
             },
-            delimiters: ['${', '}'] // Use different delimiters to avoid Flask conflict
+            delimiters: ['${', '}'] // Keep Vue delimiters distinct from Flask's Jinja
         }).mount('#app');
     </script>
 

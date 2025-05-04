@@ -1,35 +1,46 @@
 # app.py
+import os
+import sys
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import os
-from openai import OpenAI
+from openai import OpenAI # Keep using the OpenAI library
 import json
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 from sqlalchemy import select
-import threading # Import threading
+import threading
+from dotenv import load_dotenv # Import load_dotenv
+import httpx 
+import re
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////opt/transcription-app/instance/transcriptions.db' # Make sure path is correct
-app.config['UPLOAD_FOLDER'] = 'uploads'
+# Ensure the path uses the directory structure from your setup script
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////opt/transcription-app/instance/transcriptions.db'
+app.config['UPLOAD_FOLDER'] = '/opt/transcription-app/uploads' # Use absolute path based on setup
 app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250MB max file size
 db = SQLAlchemy()
 db.init_app(app)
 
 # Ensure upload and instance directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-# os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')), exist_ok=True)
+# Assuming the instance folder is handled correctly by Flask or created by setup.sh
+# os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '/')), exist_ok=True)
 
 
 # --- Database Models ---
 class Recording(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200))
+    # Title will now often be AI-generated, maybe start with filename?
+    title = db.Column(db.String(200), nullable=True) # Allow Null initially
     participants = db.Column(db.String(500))
     notes = db.Column(db.Text)
-    transcription = db.Column(db.Text, nullable=True) # Allow null initially
-    status = db.Column(db.String(50), default='PENDING') # Add status field: PENDING, PROCESSING, COMPLETED, FAILED
+    transcription = db.Column(db.Text, nullable=True)
+    summary = db.Column(db.Text, nullable=True) # <-- ADDED: Summary field
+    status = db.Column(db.String(50), default='PENDING') # PENDING, PROCESSING, SUMMARIZING, COMPLETED, FAILED
     audio_path = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     file_size = db.Column(db.Integer)  # Store file size in bytes
@@ -41,7 +52,8 @@ class Recording(db.Model):
             'participants': self.participants,
             'notes': self.notes,
             'transcription': self.transcription,
-            'status': self.status, # Include status
+            'summary': self.summary, # <-- ADDED: Include summary
+            'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'file_size': self.file_size
         }
@@ -49,45 +61,182 @@ class Recording(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- API client setup ---
-# Ensure you have your API key and base URL configured correctly
-# For local testing, you might use environment variables or a config file
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY", "cant-be-empty"), # Use env var or default
-    base_url=os.environ.get("OPENAI_BASE_URL", "http://192.168.68.85:1611/v1/") # Use env var or default
-)
+# --- API client setup for OpenRouter ---
+# Use environment variables from .env
+openrouter_api_key = os.environ.get("OPENROUTER_API_KEY")
+openrouter_base_url = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+openrouter_model_name = os.environ.get("OPENROUTER_MODEL_NAME", "openai/gpt-3.5-turbo") # Default if not set
 
-# --- Background Transcription Task ---
-def transcribe_audio_task(app_context, recording_id, filepath):
-    """Runs the transcription in a background thread."""
+http_client_no_proxy = httpx.Client(verify=True) # verify=True is default, but good to be explicit
+
+if not openrouter_api_key:
+    app.logger.warning("OPENROUTER_API_KEY not found. Title/Summary generation DISABLED.")
+else:
+    try:
+        # ---> Pass the custom httpx_client <---
+        client = OpenAI(
+            api_key=openrouter_api_key,
+            base_url=openrouter_base_url,
+            http_client=http_client_no_proxy # Pass the proxy-disabled client
+        )
+        app.logger.info(f"OpenRouter client initialized. Using model: {openrouter_model_name}")
+    except Exception as client_init_e:
+         app.logger.error(f"Failed to initialize OpenRouter client: {client_init_e}", exc_info=True)
+
+# Store details for the transcription client (potentially different)
+transcription_api_key = os.environ.get("OPENAI_API_KEY", "cant-be-empty")
+transcription_base_url = os.environ.get("OPENAI_BASE_URL", "http://192.168.68.85:1611/v1/")
+
+app.logger.info(f"Using OpenRouter model for summaries: {openrouter_model_name}")
+
+# --- Background Transcription & Summarization Task ---
+def transcribe_audio_task(app_context, recording_id, filepath, original_filename):
+    """Runs the transcription and summarization in a background thread."""
     with app_context: # Need app context for db operations in thread
         recording = db.session.get(Recording, recording_id)
         if not recording:
-            print(f"Error: Recording {recording_id} not found for transcription.")
+            app.logger.error(f"Error: Recording {recording_id} not found for transcription.")
             return
 
         try:
-            print(f"Starting transcription for recording {recording_id}...")
+            app.logger.info(f"Starting transcription for recording {recording_id} ({original_filename})...")
             recording.status = 'PROCESSING'
             db.session.commit()
 
+            # --- Step 1: Transcription ---
             with open(filepath, 'rb') as audio_file:
-                transcript = client.audio.transcriptions.create(
-                    model="Systran/faster-distil-whisper-large-v3", # Or your desired model
+                # NOTE: This still uses the hardcoded Whisper model.
+                # If you want OpenRouter for transcription too, change the model here
+                # and potentially adjust the API call if needed.
+                # For now, assuming Whisper via a local compatible endpoint.
+                # You might need a *separate* client for Whisper if it's at a different URL.
+                # Example using the configured client (assuming it points to Whisper or OpenRouter handles it):
+                transcription_client = OpenAI(
+                    api_key=transcription_api_key,
+                    base_url=transcription_base_url,
+                    http_client=http_client_no_proxy # Reuse the same client configuration
+                )
+                transcript = transcription_client.audio.transcriptions.create(
+                    model="Systran/faster-distil-whisper-large-v3", # Your Whisper model
                     file=audio_file,
                     language="en" # Specify language if known
                 )
-
             recording.transcription = transcript.text
-            recording.status = 'COMPLETED'
-            print(f"Transcription COMPLETED for recording {recording_id}.")
+            app.logger.info(f"Transcription completed for recording {recording_id}. Text length: {len(recording.transcription)}")
+            # Don't commit yet, proceed to summarization
+
+            # --- Step 2: Title & Summary Generation using OpenRouter ---
+            if client is None: # Check if OpenRouter client initialized successfully earlier
+                app.logger.warning(f"Skipping summary for {recording_id}: OpenRouter client not configured.")
+                recording.summary = "[Summary skipped: OpenRouter client not configured]"
+                recording.status = 'COMPLETED'
+                db.session.commit()
+                return # Exit cleanly
+            
+            recording.status = 'SUMMARIZING' # Update status
             db.session.commit()
+            app.logger.info(f"Requesting title and summary from OpenRouter for recording {recording_id} using model {openrouter_model_name}...")
+
+            if not recording.transcription or len(recording.transcription.strip()) < 10: # Basic check for valid transcript
+                 app.logger.warning(f"Transcription for recording {recording_id} is too short or empty. Skipping summarization.")
+                 recording.status = 'COMPLETED' # Mark as completed even without summary
+                 recording.summary = "[Summary skipped due to short transcription]"
+                 db.session.commit()
+                 return # Exit the task cleanly
+
+            # Prepare the prompt for OpenRouter
+            prompt_text = f"""Analyze the following audio transcription and generate a concise title and a brief summary.
+
+Transcription:
+\"\"\"
+{recording.transcription[:30000]}
+\"\"\"
+
+Respond STRICTLY with a JSON object containing two keys: "title" (a short, descriptive title, max 15 words) and "summary" (a paragraph summarizing the key points, max 150 words).
+Example Format:
+{{
+  "title": "Example Meeting Discussion on Q3 Results",
+  "summary": "The meeting covered the financial results for Q3, highlighting key achievements and areas for improvement. Action items were assigned for follow-up."
+}}
+
+JSON Response:""" # The prompt guides the model towards the desired output
+
+            try:
+                # Use the OpenRouter client configured earlier
+                completion = client.chat.completions.create(
+                    model=openrouter_model_name,
+                    messages=[
+                        {"role": "system", "content": "You are an AI assistant that generates titles and summaries for meeting transcripts. Respond only with the requested JSON object."},
+                        {"role": "user", "content": prompt_text}
+                    ],
+                    temperature=0.5, # Adjust temperature as needed
+                    max_tokens=300, # Adjust based on expected title+summary length
+                    response_format={"type": "json_object"} # Request JSON output
+                )
+
+                response_content = completion.choices[0].message.content
+                app.logger.debug(f"Raw OpenRouter response for {recording_id}: {response_content}")
+                
+                try:
+                    response_content = completion.choices[0].message.content
+                    app.logger.debug(f"Raw OpenRouter response for {recording_id}: {response_content}")
+
+                    # Use regex to extract JSON content from potential markdown code blocks
+                    # This looks for content between markdown code blocks or just takes the whole content
+                    json_match = re.search(r'```(?:json)?(.*?)```|(.+)', response_content, re.DOTALL)
+                    
+                    if json_match:
+                        # Use the first group that matched (either between ``` or the whole content)
+                        sanitized_response = json_match.group(1) if json_match.group(1) else json_match.group(2)
+                        sanitized_response = sanitized_response.strip()
+                    else:
+                        sanitized_response = response_content.strip()
+                        
+                    summary_data = json.loads(response_content)
+                    generated_title = summary_data.get("title")
+                    generated_summary = summary_data.get("summary")
+
+                    if generated_title and generated_summary:
+                        # Update recording with AI generated content
+                        recording.title = generated_title.strip()
+                        recording.summary = generated_summary.strip()
+                        recording.status = 'COMPLETED'
+                        app.logger.info(f"Title and summary generated successfully for recording {recording_id}.")
+                    else:
+                        app.logger.warning(f"OpenRouter response for {recording_id} lacked 'title' or 'summary' key. Response: {response_content}")
+                        recording.summary = "[AI summary generation failed: Invalid JSON structure]"
+                        recording.status = 'COMPLETED' # Still completed, but summary failed
+
+                except json.JSONDecodeError as json_e:
+                    app.logger.error(f"Failed to parse JSON response from OpenRouter for {recording_id}: {json_e}. Response: {response_content}")
+                    recording.summary = f"[AI summary generation failed: Invalid JSON response ({json_e})]"
+                    recording.status = 'COMPLETED' # Mark as completed, summary failed
+
+            except Exception as summary_e:
+                app.logger.error(f"Error calling OpenRouter API for summary ({recording_id}): {str(summary_e)}")
+                # Keep transcription, but mark summary failed. Don't change status from SUMMARIZING yet.
+                recording.summary = f"[AI summary generation failed: API Error ({str(summary_e)})]"
+                recording.status = 'COMPLETED' # Even if summary fails, transcription worked.
+
+
+            db.session.commit() # Final commit for this step
 
         except Exception as e:
-            print(f"Transcription FAILED for recording {recording_id}: {str(e)}")
-            recording.transcription = f"Transcription failed: {str(e)}" # Store error message
-            recording.status = 'FAILED'
-            db.session.commit()
+            db.session.rollback() # Rollback if any step failed critically
+            app.logger.error(f"Processing FAILED for recording {recording_id}: {str(e)}", exc_info=True)
+            # Retrieve recording again in case session was rolled back
+            recording = db.session.get(Recording, recording_id)
+            if recording:
+                 # Ensure status reflects failure even after rollback/retrieve attempt
+                if recording.status not in ['COMPLETED', 'FAILED']: # Avoid overwriting final state
+                    recording.status = 'FAILED'
+                if not recording.transcription: # If transcription itself failed
+                     recording.transcription = f"Processing failed: {str(e)}"
+                # Add error note to summary if appropriate stage was reached
+                if recording.status == 'SUMMARIZING' and not recording.summary:
+                     recording.summary = f"[Processing failed during summarization: {str(e)}]"
+
+                db.session.commit()
 
 
 # --- Flask Routes ---
@@ -107,29 +256,22 @@ def get_recordings():
 
 @app.route('/save', methods=['POST'])
 def save_metadata():
-    # This route remains largely the same, just updates metadata
     try:
         data = request.json
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-
+        if not data: return jsonify({'error': 'No data provided'}), 400
         recording_id = data.get('id')
-        if not recording_id:
-            return jsonify({'error': 'No recording ID provided'}), 400
+        if not recording_id: return jsonify({'error': 'No recording ID provided'}), 400
 
         recording = db.session.get(Recording, recording_id)
-        if not recording:
-            return jsonify({'error': 'Recording not found'}), 404
+        if not recording: return jsonify({'error': 'Recording not found'}), 404
 
         # Update fields if provided
-        if 'title' in data:
-            recording.title = data['title']
-        if 'participants' in data:
-            recording.participants = data['participants']
-        if 'notes' in data:
-            recording.notes = data['notes']
-        # Do not update transcription or status here
+        if 'title' in data: recording.title = data['title']
+        if 'participants' in data: recording.participants = data['participants']
+        if 'notes' in data: recording.notes = data['notes']
+        if 'summary' in data: recording.summary = data['summary'] # <-- ADDED: Allow saving edited summary
 
+        # Do not update transcription or status here
         db.session.commit()
         return jsonify({'success': True, 'recording': recording.to_dict()})
 
@@ -137,6 +279,7 @@ def save_metadata():
         db.session.rollback()
         app.logger.error(f"Error saving metadata for recording {recording_id}: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -149,42 +292,44 @@ def upload_file():
             return jsonify({'error': 'No file selected'}), 400
 
         filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # Ensure filepath uses the configured UPLOAD_FOLDER
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}")
 
         # Get file size before saving
         file.seek(0, os.SEEK_END)
         file_size = file.tell()
         file.seek(0)
 
-        # Check size limit again (Flask's MAX_CONTENT_LENGTH handles the actual request blocking)
+        # Check size limit again
         if file_size > app.config['MAX_CONTENT_LENGTH']:
-             raise RequestEntityTooLarge()
+            raise RequestEntityTooLarge()
 
         file.save(filepath)
-        print(f"File saved to {filepath}")
+        app.logger.info(f"File saved to {filepath}")
 
-        # Create initial database entry with PENDING status
+        # Create initial database entry with PENDING status and filename as placeholder title
         recording = Recording(
             audio_path=filepath,
-            title=f"Untitled - {datetime.now().strftime('%Y-%m-%d %H:%M')}", # Simpler default title
+            # Use filename (without path part) as initial title
+            title=f"Recording - {filename}",
             file_size=file_size,
             status='PENDING' # Explicitly set status
         )
         db.session.add(recording)
         db.session.commit()
-        print(f"Initial recording record created with ID: {recording.id}")
+        app.logger.info(f"Initial recording record created with ID: {recording.id}")
 
-        # --- Start transcription in background thread ---
-        # Pass the app context to the thread
+        # --- Start transcription & summarization in background thread ---
         thread = threading.Thread(
             target=transcribe_audio_task,
-            args=(app.app_context(), recording.id, filepath)
+            # Pass original filename for logging clarity
+            args=(app.app_context(), recording.id, filepath, filename)
         )
         thread.start()
-        print(f"Background transcription thread started for recording ID: {recording.id}")
+        app.logger.info(f"Background processing thread started for recording ID: {recording.id}")
 
         # Return the initial recording data and ID immediately
-        return jsonify(recording.to_dict()), 202 # 202 Accepted indicates processing started
+        return jsonify(recording.to_dict()), 202 # 202 Accepted
 
     except RequestEntityTooLarge:
         max_size_mb = app.config['MAX_CONTENT_LENGTH'] / (1024 * 1024)
@@ -198,37 +343,36 @@ def upload_file():
         app.logger.error(f"Error during file upload: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-# --- NEW: Status Endpoint ---
+
+# Status Endpoint (no changes needed, it returns the full recording dict)
 @app.route('/status/<int:recording_id>', methods=['GET'])
 def get_status(recording_id):
-    """Endpoint to check the transcription status."""
+    """Endpoint to check the transcription/summarization status."""
     try:
         recording = db.session.get(Recording, recording_id)
         if not recording:
             return jsonify({'error': 'Recording not found'}), 404
-
-        # Return the full recording data, including status and transcription (if available)
         return jsonify(recording.to_dict())
-
     except Exception as e:
         app.logger.error(f"Error fetching status for recording {recording_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
-
+# Get Audio Endpoint (no changes needed)
 @app.route('/audio/<int:recording_id>')
 def get_audio(recording_id):
     try:
         recording = db.session.get(Recording, recording_id)
         if not recording or not recording.audio_path:
             return jsonify({'error': 'Recording or audio file not found'}), 404
-        # Ensure the file actually exists before trying to send it
         if not os.path.exists(recording.audio_path):
-             return jsonify({'error': 'Audio file missing from server'}), 404
+            app.logger.error(f"Audio file missing from server: {recording.audio_path}")
+            return jsonify({'error': 'Audio file missing from server'}), 404
         return send_file(recording.audio_path)
     except Exception as e:
         app.logger.error(f"Error serving audio for recording {recording_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
+# Delete Recording Endpoint (no changes needed functionally)
 @app.route('/recording/<int:recording_id>', methods=['DELETE'])
 def delete_recording(recording_id):
     try:
@@ -240,15 +384,14 @@ def delete_recording(recording_id):
         try:
             if recording.audio_path and os.path.exists(recording.audio_path):
                 os.remove(recording.audio_path)
-                print(f"Deleted audio file: {recording.audio_path}")
+                app.logger.info(f"Deleted audio file: {recording.audio_path}")
         except Exception as e:
-            # Log error but proceed to delete DB record
             app.logger.error(f"Error deleting audio file {recording.audio_path}: {e}")
 
         # Delete the database record
         db.session.delete(recording)
         db.session.commit()
-        print(f"Deleted recording record ID: {recording_id}")
+        app.logger.info(f"Deleted recording record ID: {recording_id}")
 
         return jsonify({'success': True})
     except Exception as e:
@@ -256,7 +399,9 @@ def delete_recording(recording_id):
         app.logger.error(f"Error deleting recording {recording_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 if __name__ == '__main__':
-    # Use waitress or gunicorn in production instead of Flask's dev server
-    # Example: waitress-serve --host 0.0.0.0 --port 8899 app:app
-    app.run(host='0.0.0.0', port=8899, debug=True) # debug=True reloads, which can interfere with threads. Set False for testing threads properly. Consider waitress for better threading.
+    # Consider using waitress or gunicorn for production
+    # waitress-serve --host 0.0.0.0 --port 8899 app:app
+    # For development:
+    app.run(host='0.0.0.0', port=8899, debug=True) # Set debug=False if thread issues arise

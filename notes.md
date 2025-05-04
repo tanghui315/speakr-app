@@ -3,3 +3,6 @@
 python create_docs.py
 
 ## start/stop
+
+source venv/bin/activate
+gunicorn --workers 3 --bind 0.0.0.0:8899 --timeout 600 app:app

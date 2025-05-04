@@ -38,6 +38,7 @@ After=network.target
 
 [Service]
 User=$USER
+EnvironmentFile=/opt/transcription-app/.env
 WorkingDirectory=/opt/transcription-app
 Environment="PATH=/opt/transcription-app/venv/bin"
 Environment="PYTHONPATH=/opt/transcription-app"
