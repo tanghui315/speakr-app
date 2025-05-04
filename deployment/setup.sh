@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Create directory for the application
+sudo mkdir -p /opt/transcription-app
+sudo chown $USER:$USER /opt/transcription-app
+
+# Copy application files
+cp app.py /opt/transcription-app/
+cp -r templates /opt/transcription-app/
+cp requirements.txt /opt/transcription-app/
+cp reset_db.py /opt/transcription-app/
+
+# Create and activate virtual environment
+python3 -m venv /opt/transcription-app/venv
+source /opt/transcription-app/venv/bin/activate
+
+# Install requirements
+cd /opt/transcription-app
+pip install -r requirements.txt
+
+# Create directories for uploads and database with proper permissions
+mkdir -p /opt/transcription-app/uploads
+mkdir -p /opt/transcription-app/instance
+chmod 755 /opt/transcription-app/uploads
+chmod 755 /opt/transcription-app/instance
+
+# Initialize the database
+python reset_db.py
+
+# Set proper ownership for all files
+sudo chown -R $USER:$USER /opt/transcription-app
+
+# Create systemd service file
+sudo tee /etc/systemd/system/transcription.service << EOF
+[Unit]
+Description=Transcription Web Application
+After=network.target
+
+[Service]
+User=$USER
+WorkingDirectory=/opt/transcription-app
+Environment="PATH=/opt/transcription-app/venv/bin"
+Environment="PYTHONPATH=/opt/transcription-app"
+ExecStart=/opt/transcription-app/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:8899 --timeout 600 app:app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd and start service
+sudo systemctl daemon-reload
+sudo systemctl restart transcription
+sudo systemctl enable transcription
+
+# Check service status
+echo "Checking service status..."
+sleep 3
+sudo systemctl status transcription
+
+echo "Installation complete! The application should be running on port 8899."
