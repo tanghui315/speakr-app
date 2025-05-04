@@ -238,6 +238,73 @@ JSON Response:""" # The prompt guides the model towards the desired output
 
                 db.session.commit()
 
+# --- Chat with Transcription ---
+@app.route('/chat', methods=['POST'])
+def chat_with_transcription():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        recording_id = data.get('recording_id')
+        user_message = data.get('message')
+        
+        if not recording_id:
+            return jsonify({'error': 'No recording ID provided'}), 400
+        if not user_message:
+            return jsonify({'error': 'No message provided'}), 400
+            
+        # Get the recording
+        recording = db.session.get(Recording, recording_id)
+        if not recording:
+            return jsonify({'error': 'Recording not found'}), 404
+            
+        # Check if OpenRouter client is available
+        if client is None:
+            return jsonify({'error': 'Chat service is not available (OpenRouter client not configured)'}), 503
+            
+        # Prepare the system prompt with the transcription
+        system_prompt = f"""You are a professional meeting analyst working with Murtaza Nasir, Assistant Professor at Wichita State University. Analyze the following meeting information and respond to the specific request.
+
+Following are the meeting participants and their roles:
+{recording.participants or "No specific participants information provided."}
+
+Following is the meeting transcript:
+<<start transcript>>
+{recording.transcription or "No transcript available."}
+<<end transcript>>
+
+Additional context and notes about the meeting:
+{recording.notes or "none"}
+"""
+        
+        # Call the LLM
+        try:
+            completion = client.chat.completions.create(
+                model=openrouter_model_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            response_content = completion.choices[0].message.content
+            
+            return jsonify({
+                'response': response_content,
+                'success': True
+            })
+            
+        except Exception as chat_error:
+            app.logger.error(f"Error calling OpenRouter API for chat: {str(chat_error)}")
+            return jsonify({'error': f'Chat service error: {str(chat_error)}'}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Error in chat endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 
 # --- Flask Routes ---
 @app.route('/')

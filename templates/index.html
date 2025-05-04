@@ -47,6 +47,77 @@
          .status-completed { color: #065f46; background-color: #d1fae5; } /* text-green-800 bg-green-100 */
          .status-failed { color: #991b1b; background-color: #fee2e2; } /* text-red-800 bg-red-100 */
          .status-pending { color: #57534e; background-color: #f5f5f4; } /* text-stone-700 bg-stone-100 */
+         
+         /* Fixed height transcription box */
+         .transcription-box {
+             height: 400px;
+             overflow-y: auto;
+             position: relative;
+         }
+         
+         /* Copy button styles */
+         .copy-btn {
+             position: sticky;
+             top: 10px;
+             right: 10px;
+             float: right;
+             background-color: rgba(255, 255, 255, 0.8);
+             border: 1px solid #e5e7eb;
+             border-radius: 0.375rem;
+             padding: 0.25rem 0.5rem;
+             font-size: 0.75rem;
+             cursor: pointer;
+             z-index: 10;
+             transition: all 0.2s ease-in-out;
+             margin-bottom: 10px;
+         }
+         
+         .copy-btn:hover {
+             background-color: #f3f4f6;
+         }
+         
+         /* Chat section styles */
+         .chat-container {
+             border: 1px solid #e5e7eb;
+             border-radius: 0.375rem;
+             display: flex;
+             flex-direction: column;
+             height: 400px;
+         }
+         
+         .chat-messages {
+             flex-grow: 1;
+             overflow-y: auto;
+             padding: 1rem;
+         }
+         
+         .chat-input-container {
+             border-top: 1px solid #e5e7eb;
+             padding: 0.75rem;
+             display: flex;
+         }
+         
+         .message {
+             margin-bottom: 1rem;
+             max-width: 80%;
+         }
+         
+         .user-message {
+             background-color: #dbeafe;
+             border-radius: 1rem 1rem 0.25rem 1rem;
+             padding: 0.75rem;
+             margin-left: auto;
+         }
+         
+         .ai-message {
+             background-color: #f3f4f6;
+             border-radius: 1rem 1rem 1rem 0.25rem;
+             padding: 0.75rem;
+         }
+         
+         .copyable {
+             position: relative;
+         }
 
     </style>
 </head>
@@ -174,23 +245,43 @@
                             </div>
 
                             <div class="grid md:grid-cols-2 gap-6 flex-grow overflow-hidden">
-                                <div class="flex flex-col overflow-hidden">
-                                    <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Transcription</h4>
-                                    <div class="flex-grow overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar">
-                                        <div v-if="selectedRecording.status === 'COMPLETED' || selectedRecording.status === 'SUMMARIZING'">
-                                            <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'No transcription available.' }</pre>
+                                <div class="flex flex-col overflow-hidden space-y-4">
+                                    <div class="flex-grow">
+                                        <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Transcription</h4>
+                                        <div class="transcription-box p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar relative">
+                                            <button @click="copyTranscription" class="copy-btn" title="Copy to clipboard">
+                                                <i class="fas fa-copy mr-1"></i> Copy
+                                            </button>
+                                            <div v-if="selectedRecording.status === 'COMPLETED' || selectedRecording.status === 'SUMMARIZING'" class="copyable">
+                                                <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'No transcription available.' }</pre>
+                                            </div>
+                                            <div v-else-if="selectedRecording.status === 'FAILED'" class="text-red-700">
+                                                <p class="font-medium mb-2">Processing Failed:</p>
+                                                <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'An unknown error occurred.' }</pre>
+                                            </div>
+                                            <div v-else class="flex items-center justify-center text-gray-500 h-full">
+                                                <i class="fas fa-spinner fa-spin mr-2"></i> Transcription in progress...
+                                            </div>
                                         </div>
-                                        <div v-else-if="selectedRecording.status === 'FAILED'" class="text-red-700">
-                                             <p class="font-medium mb-2">Processing Failed:</p>
-                                             <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'An unknown error occurred.' }</pre>
-                                        </div>
-                                        <div v-else class="flex items-center justify-center text-gray-500 h-full">
-                                            <i class="fas fa-spinner fa-spin mr-2"></i> Transcription in progress...
+                                    </div>
+                                    
+                                    <div>
+                                        <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Summary</h4>
+                                        <div class="flex-grow overflow-hidden">
+                                            <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar">
+                                                ${ selectedRecording.summary || 'No summary generated.' }
+                                            </div>
+                                            <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-red-700 custom-scrollbar">
+                                                ${ selectedRecording.summary || 'Summary generation failed or was skipped.' }
+                                            </div>
+                                            <div v-else class="h-24 flex items-center justify-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-500">
+                                                <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                 <div class="flex flex-col space-y-4 overflow-hidden">
+                                <div class="flex flex-col space-y-4 overflow-hidden">
                                     <div>
                                         <h4 class="font-semibold text-gray-700 mb-2">Audio Player</h4>
                                         <audio controls class="w-full" :key="selectedRecording.id" :src="'/audio/' + selectedRecording.id">
@@ -198,17 +289,46 @@
                                         </audio>
                                     </div>
 
-                                    <div class="flex flex-col overflow-hidden">
-                                        <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Summary</h4>
-                                         <div class="flex-grow overflow-hidden">
-                                            <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar">
-                                                ${ selectedRecording.summary || 'No summary generated.' }
+                                    <div class="flex flex-col overflow-hidden flex-grow">
+                                        <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Chat with Transcript</h4>
+                                        <div class="chat-container">
+                                            <div class="chat-messages custom-scrollbar" ref="chatMessagesRef">
+                                                <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full text-gray-500">
+                                                    <div class="text-center">
+                                                        <i class="fas fa-comments text-2xl mb-2"></i>
+                                                        <p>Ask questions about the transcript</p>
+                                                    </div>
+                                                </div>
+                                                <div v-for="(message, index) in chatMessages" :key="index" class="message" :class="message.role === 'user' ? 'user-message' : 'ai-message'">
+                                                    <div class="flex justify-between items-start">
+                                                        <div class="flex-grow">${ message.content }</div>
+                                                        <button v-if="message.role === 'assistant'" @click="copyMessage(message.content)" class="ml-2 text-gray-400 hover:text-gray-600" title="Copy response">
+                                                            <i class="fas fa-copy text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div v-if="isChatLoading" class="message ai-message">
+                                                    <div class="flex items-center">
+                                                        <i class="fas fa-spinner fa-spin mr-2"></i> Thinking...
+                                                    </div>
+                                                </div>
                                             </div>
-                                             <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-red-700 custom-scrollbar">
-                                                ${ selectedRecording.summary || 'Summary generation failed or was skipped.' }
-                                            </div>
-                                            <div v-else class="h-24 flex items-center justify-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-500">
-                                                <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
+                                            <div class="chat-input-container">
+                                                <input 
+                                                    v-model="chatInput" 
+                                                    @keyup.enter="sendChatMessage"
+                                                    type="text" 
+                                                    placeholder="Ask about the transcript..." 
+                                                    class="flex-grow px-3 py-2 border-0 focus:ring-0 focus:outline-none"
+                                                    :disabled="isChatLoading || !selectedRecording || selectedRecording.status !== 'COMPLETED'"
+                                                >
+                                                <button 
+                                                    @click="sendChatMessage" 
+                                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                                    :disabled="!chatInput.trim() || isChatLoading || !selectedRecording || selectedRecording.status !== 'COMPLETED'"
+                                                >
+                                                    <i class="fas fa-paper-plane"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -217,11 +337,10 @@
                                         <h4 class="font-semibold text-gray-700 mb-1">Participants</h4>
                                         <p class="text-sm bg-gray-50 p-3 rounded border border-gray-200 min-h-[40px]">${ selectedRecording.participants || 'None specified' }</p>
                                     </div>
-                                    <div class="flex flex-col overflow-hidden flex-grow">
-                                         <h4 class="font-semibold text-gray-700 mb-1 flex-shrink-0">Notes</h4>
-                                        <div class="flex-grow overflow-hidden">
-                                            <pre class="text-sm bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap h-40 overflow-y-auto custom-scrollbar font-sans">${ selectedRecording.notes || 'No notes' }</pre>
-                                        </div>
+                                    
+                                    <div class="flex flex-col overflow-hidden">
+                                        <h4 class="font-semibold text-gray-700 mb-1">Notes</h4>
+                                        <pre class="text-sm bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap h-40 overflow-y-auto custom-scrollbar font-sans">${ selectedRecording.notes || 'No notes' }</pre>
                                     </div>
                                 </div>
                             </div>
@@ -934,6 +1053,101 @@
                  }, { deep: true });
 
 
+                // --- Chat functionality ---
+                const showChat = ref(false);
+                const chatMessages = ref([]);
+                const chatInput = ref('');
+                const isChatLoading = ref(false);
+                
+                // Create a ref for the chat messages container
+                const chatMessagesRef = ref(null);
+                
+                const sendChatMessage = async () => {
+                    if (!chatInput.value.trim() || isChatLoading.value || !selectedRecording.value || selectedRecording.value.status !== 'COMPLETED') {
+                        return;
+                    }
+                    
+                    const message = chatInput.value.trim();
+
+                    // Ensure chatMessages.value is an array before pushing
+                    if (!Array.isArray(chatMessages.value)) {
+                        console.warn('chatMessages.value was not an array! Resetting. Value was:', chatMessages.value);
+                        chatMessages.value = []; // Reset if corrupted
+                    }
+
+                    chatMessages.value.push({ role: 'user', content: message });
+                    chatInput.value = '';
+                    isChatLoading.value = true;
+                    
+                    // Scroll to bottom of chat
+                    await nextTick();
+                    // Use the correctly named ref
+                    if (chatMessagesRef.value) { 
+                        chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight;
+                    }
+                    
+                    try {
+                        const response = await fetch('/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                recording_id: selectedRecording.value.id,
+                                message: message
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.error || 'Failed to get chat response');
+                        
+                        chatMessages.value.push({ role: 'assistant', content: data.response });
+                    } catch (error) {
+                        console.error('Chat Error:', error);
+                        setGlobalError(`Chat error: ${error.message}`);
+                        chatMessages.value.push({ role: 'assistant', content: `Error: ${error.message}` });
+                    } finally {
+                        isChatLoading.value = false;
+                        // Scroll to bottom of chat
+                        await nextTick();
+                         // Use the correctly named ref
+                        if (chatMessagesRef.value) {
+                            chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight;
+                        }
+                    }
+                };
+                
+                const copyMessage = (text) => {
+                    navigator.clipboard.writeText(text)
+                        .then(() => {
+                            setGlobalError('Response copied to clipboard!', 2000);
+                        })
+                        .catch(err => {
+                            console.error('Copy failed:', err);
+                            setGlobalError('Failed to copy: ' + err.message);
+                        });
+                };
+                
+                const copyTranscription = () => {
+                    if (!selectedRecording.value || !selectedRecording.value.transcription) {
+                        setGlobalError('No transcription available to copy.');
+                        return;
+                    }
+                    
+                    navigator.clipboard.writeText(selectedRecording.value.transcription)
+                        .then(() => {
+                            setGlobalError('Transcription copied to clipboard!', 2000);
+                        })
+                        .catch(err => {
+                            console.error('Copy failed:', err);
+                            setGlobalError('Failed to copy: ' + err.message);
+                        });
+                };
+                
+                // Clear chat messages when recording changes
+                watch(selectedRecording, () => {
+                    chatMessages.value = [];
+                    showChat.value = false;
+                });
+
                 return {
                     // State
                     currentView, dragover, recordings, selectedRecording, // currentRecording removed
@@ -942,6 +1156,8 @@
                     // Multi-upload State
                     uploadQueue, currentlyProcessingFile, processingProgress, processingMessage,
                     isProcessingActive, progressPopupMinimized,
+                    // Chat State
+                    showChat, chatMessages, chatInput, isChatLoading, chatMessagesRef, // <-- Added chatMessagesRef
                     // Computed
                     groupedRecordings, totalInQueue, completedInQueue, queuedFiles, finishedFilesInQueue,
                     // Methods
@@ -949,6 +1165,8 @@
                     selectRecording, editRecording, cancelEdit, saveEdit, confirmDelete,
                     cancelDelete, deleteRecording, switchToUploadView, switchToGalleryView,
                     formatFileSize, setGlobalError, handleDragLeave, formatStatus, getStatusClass,
+                    // Chat Methods
+                    sendChatMessage, copyMessage, copyTranscription,
                  }
             },
             delimiters: ['${', '}'] // Keep Vue delimiters distinct from Flask's Jinja

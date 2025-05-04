@@ -131,6 +131,7 @@ from sqlalchemy import select
 import threading
 from dotenv import load_dotenv # Import load_dotenv
 import httpx 
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -294,9 +295,22 @@ JSON Response:""" # The prompt guides the model towards the desired output
 
                 response_content = completion.choices[0].message.content
                 app.logger.debug(f"Raw OpenRouter response for {recording_id}: {response_content}")
-
-                # Parse the JSON response
+                
                 try:
+                    response_content = completion.choices[0].message.content
+                    app.logger.debug(f"Raw OpenRouter response for {recording_id}: {response_content}")
+
+                    # Use regex to extract JSON content from potential markdown code blocks
+                    # This looks for content between markdown code blocks or just takes the whole content
+                    json_match = re.search(r'```(?:json)?(.*?)```|(.+)', response_content, re.DOTALL)
+                    
+                    if json_match:
+                        # Use the first group that matched (either between ``` or the whole content)
+                        sanitized_response = json_match.group(1) if json_match.group(1) else json_match.group(2)
+                        sanitized_response = sanitized_response.strip()
+                    else:
+                        sanitized_response = response_content.strip()
+                        
                     summary_data = json.loads(response_content)
                     generated_title = summary_data.get("title")
                     generated_summary = summary_data.get("summary")
