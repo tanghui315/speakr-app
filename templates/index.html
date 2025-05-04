@@ -7,276 +7,368 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Add a subtle transition for dragover effect */
+        .drag-area {
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+         /* Custom scrollbar for webkit browsers (optional) */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c5c5c5;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        /* Ensure body takes full height for drop zone */
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        #app {
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        main {
+            flex-grow: 1;
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
-    <div id="app" class="container mx-auto px-4 py-8">
-        <nav class="flex justify-between mb-8 items-center">
-            <h1 class="text-2xl font-bold">Audio Transcription</h1>
+    <div id="app" class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col">
+        <header class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <h1 class="text-3xl font-bold text-gray-800 cursor-pointer" @click="switchToGalleryView" title="Go to Gallery">
+                Audio Transcription
+            </h1>
             <div>
-                <button @click="switchToUploadView" class="px-4 py-2 mr-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                <button @click="switchToUploadView" class="px-4 py-2 mr-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150 ease-in-out">
                     <i class="fas fa-plus mr-1"></i> New Recording
                 </button>
-                <button @click="switchToGalleryView" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                <button
+                    @click="switchToGalleryView"
+                    :class="{
+                        'bg-white text-gray-700 border border-gray-300': currentView !== 'gallery',
+                        'bg-blue-100 text-blue-700 border border-blue-300': currentView === 'gallery'
+                    }"
+                    class="px-4 py-2 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition duration-150 ease-in-out">
                     <i class="fas fa-images mr-1"></i> Gallery
                 </button>
             </div>
-        </nav>
+        </header>
 
-         <div v-if="globalError" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded" role="alert">
-            <strong class="font-bold">Error:</strong>
-            <span class="block sm:inline">${ globalError }</span>
-        </div>
-
-        <div v-if="currentView === 'upload'"
-             @dragover.prevent="dragover = true"
-             @dragleave.prevent="dragover = false"
-             @drop.prevent="handleDrop"
-             :class="{'border-blue-500 bg-blue-50': dragover, 'border-gray-300': !dragover}"
-             class="border-2 border-dashed rounded-lg p-12 text-center transition-all duration-200 bg-white shadow">
-
-            <div v-if="isProcessing" class="space-y-4">
-                <div class="animate-spin mx-auto h-12 w-12">
-                    <i class="fas fa-circle-notch text-4xl text-blue-500"></i>
+        <div v-if="globalError" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg" role="alert">
+            <div class="flex justify-between items-center">
+                <div>
+                    <strong class="font-bold">Error:</strong>
+                    <span class="block sm:inline ml-2">${ globalError }</span>
                 </div>
-                <h2 class="text-xl mb-2">Processing your audio file...</h2>
-                <p class="text-sm text-gray-600 mt-2">${ processingStatus.message }</p>
-                 <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mt-4 max-w-md mx-auto">
-                    <div class="bg-blue-600 h-2.5 rounded-full" :style="{ width: processingStatus.progress + '%' }"></div>
-                </div>
-            </div>
-
-            <div v-else>
-                <i class="fas fa-cloud-upload-alt text-4xl mb-4 text-blue-500"></i>
-                <h2 class="text-xl mb-2">Drag and drop your audio file here</h2>
-                <p class="text-gray-500">or</p>
-                <input type="file" @change="handleFileSelect" accept="audio/*" class="hidden" ref="fileInput">
-                <button @click="$refs.fileInput.click()" class="mt-4 px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                    Select File
-                </button>
-                 <p class="text-xs text-gray-500 mt-4">Max file size: 250 MB</p>
+                <button @click="globalError = null" class="text-red-700 hover:text-red-900 font-bold">&times;</button>
             </div>
         </div>
 
-        <div v-if="currentView === 'input' && currentRecording" class="grid md:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-lg font-semibold mb-4">Transcription</h3>
-                <div class="h-96 overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200">
-                    <pre class="whitespace-pre-wrap text-sm">${ currentRecording.transcription || 'Transcription not available.' }</pre>
-                </div>
-            </div>
+        <main class="flex-grow">
 
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-lg font-semibold mb-4">Recording Details</h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Title</label>
-                        <input v-model="currentRecording.title"
-                               @input="autoSave"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Participants</label>
-                        <input v-model="currentRecording.participants"
-                               @input="autoSave"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Notes</label>
-                        <textarea v-model="currentRecording.notes"
-                                  @input="autoSave"
-                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                  rows="4"></textarea>
-                    </div>
-                     <div class="text-sm text-gray-500">
-                         <p>File Size: ${ formatFileSize(currentRecording.file_size) }</p>
-                         <p>Created: ${ new Date(currentRecording.created_at).toLocaleString() }</p>
-                     </div>
-                    <div class="pt-4 text-right">
-                         <button @click="switchToGalleryView" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                            Back to Gallery
-                         </button>
+            <div v-if="currentView === 'gallery'"
+                 class="flex-grow flex flex-col rounded-lg drag-area"
+                 @dragover.prevent="dragover = true"
+                 @dragleave.prevent="dragover = false"
+                 @drop.prevent="handleDrop"
+                 :class="{'bg-blue-50 border-2 border-dashed border-blue-400': dragover, 'bg-transparent border-2 border-transparent': !dragover}">
+
+                 <div v-if="dragover" class="absolute inset-0 flex items-center justify-center bg-blue-500 bg-opacity-20 z-10 rounded-lg pointer-events-none">
+                    <div class="text-center p-6 bg-white rounded-lg shadow-xl">
+                         <i class="fas fa-upload text-4xl text-blue-500 mb-3"></i>
+                        <p class="text-xl font-semibold text-gray-700">Drop audio file here to upload</p>
                     </div>
                 </div>
-            </div>
-        </div>
 
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-grow">
+                    <div class="lg:col-span-1 bg-white p-4 rounded-lg shadow-md flex flex-col">
+                        <h3 class="text-lg font-semibold mb-4 sticky top-0 bg-white pb-3 border-b border-gray-200">Recordings</h3>
+                        <div v-if="isLoadingRecordings" class="text-center text-gray-500 py-4">
+                            <i class="fas fa-spinner fa-spin mr-2"></i> Loading recordings...
+                        </div>
+                         <div v-else-if="recordings.length === 0" class="text-center text-gray-500 py-4 flex-grow flex flex-col items-center justify-center">
+                             <i class="fas fa-folder-open text-4xl text-gray-400 mb-3"></i>
+                            <p>No recordings yet.</p>
+                            <p>Upload one or drag & drop here!</p>
+                         </div>
+                        <div v-else class="space-y-4 overflow-y-auto custom-scrollbar flex-grow pr-1">
+                             <div v-for="group in groupedRecordings" :key="group.title" class="mb-3">
+                                <h4 class="font-medium text-gray-500 text-xs uppercase tracking-wider mb-2 sticky top-0 bg-white py-1">${ group.title }</h4>
+                                <ul class="space-y-1">
+                                    <li v-for="recording in group.items"
+                                        :key="recording.id"
+                                        @click="selectRecording(recording)"
+                                        class="cursor-pointer p-3 rounded-md flex justify-between items-center transition duration-150 ease-in-out"
+                                        :class="{
+                                            'bg-blue-100 hover:bg-blue-200 ring-1 ring-blue-300': selectedRecording?.id === recording.id,
+                                            'hover:bg-gray-100': selectedRecording?.id !== recording.id
+                                        }">
+                                        <div class="flex items-center overflow-hidden mr-2">
+                                            <i class="fas fa-file-audio text-blue-500 mr-2 flex-shrink-0"></i>
+                                            <span class="text-sm font-medium text-gray-800 truncate">${ recording.title }</span>
+                                        </div>
+                                        <div class="flex space-x-2 flex-shrink-0 items-center">
+                                             <span v-if="recording.status === 'PROCESSING' || recording.status === 'PENDING'" class="text-xs text-blue-600 italic flex items-center" title="Processing...">
+                                                <i class="fas fa-spinner fa-spin mr-1"></i> Processing
+                                            </span>
+                                            <span v-else-if="recording.status === 'FAILED'" class="text-xs text-red-600 italic flex items-center" title="Transcription Failed">
+                                                <i class="fas fa-exclamation-triangle mr-1"></i> Failed
+                                            </span>
+                                             <span v-else-if="recording.status === 'COMPLETED'" class="text-xs text-green-600" title="Completed">
+                                                <i class="fas fa-check-circle"></i>
+                                            </span>
+                                            <button @click.stop="editRecording(recording)" class="text-gray-500 hover:text-blue-600 text-xs p-1 rounded hover:bg-gray-200" title="Edit Details">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click.stop="confirmDelete(recording)" class="text-gray-500 hover:text-red-600 text-xs p-1 rounded hover:bg-gray-200" title="Delete Recording">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
 
-        <div v-if="currentView === 'gallery'" class="grid lg:grid-cols-4 gap-8">
-            <div class="lg:col-span-1 bg-white p-4 rounded-lg shadow overflow-y-auto max-h-[80vh]">
-                <h3 class="text-lg font-semibold mb-4 sticky top-0 bg-white pb-2 border-b">Recordings</h3>
-                 <div v-if="recordings.length === 0" class="text-center text-gray-500 py-4">
-                    No recordings yet. Upload one!
-                 </div>
-                <div v-else class="space-y-4">
-                    <div v-for="group in groupedRecordings" :key="group.title">
-                         <h4 v-if="group.items.length > 0" class="font-medium text-gray-700 mb-2 text-sm uppercase tracking-wide">${ group.title }</h4>
-                        <ul class="space-y-1">
-                            <li v-for="recording in group.items"
-                                :key="recording.id"
-                                @click="selectRecording(recording)"
-                                class="cursor-pointer p-2 rounded hover:bg-gray-100 flex justify-between items-center text-sm"
-                                :class="{'bg-blue-100 hover:bg-blue-200': selectedRecording?.id === recording.id}">
-                                <span class="truncate pr-2">${ recording.title }</span>
+                    <div class="lg:col-span-3 bg-white p-6 rounded-lg shadow-md flex flex-col">
+                        <div v-if="selectedRecording" class="flex-grow">
+                            <div class="flex flex-col sm:flex-row justify-between items-start mb-4 border-b border-gray-200 pb-4">
+                                <div class="mb-3 sm:mb-0">
+                                    <h3 class="text-2xl font-semibold text-gray-900">${ selectedRecording.title }</h3>
+                                    <p class="text-sm text-gray-500 mt-1">
+                                        Created: ${ new Date(selectedRecording.created_at).toLocaleString() } | Size: ${ formatFileSize(selectedRecording.file_size) }
+                                    </p>
+                                     <span v-if="selectedRecording.status === 'PROCESSING' || selectedRecording.status === 'PENDING'" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Status: Processing</span>
+                                     <span v-else-if="selectedRecording.status === 'FAILED'" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Status: Failed</span>
+                                     <span v-else-if="selectedRecording.status === 'COMPLETED'" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Status: Completed</span>
+                                </div>
                                 <div class="flex space-x-2 flex-shrink-0">
-                                    <span v-if="recording.status === 'PROCESSING' || recording.status === 'PENDING'" class="text-xs text-blue-500 italic">Processing...</span>
-                                    <span v-else-if="recording.status === 'FAILED'" class="text-xs text-red-500 italic">Failed</span>
-                                    <button @click.stop="editRecording(recording)"
-                                            class="text-blue-500 hover:text-blue-700 text-xs" title="Edit Details">
-                                        <i class="fas fa-edit"></i>
+                                    <button @click="editRecording(selectedRecording)" class="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm shadow-sm">
+                                        <i class="fas fa-edit mr-1"></i> Edit Details
                                     </button>
-                                    <button @click.stop="confirmDelete(recording)"
-                                            class="text-red-500 hover:text-red-700 text-xs" title="Delete Recording">
-                                        <i class="fas fa-trash"></i>
+                                    <button @click="confirmDelete(selectedRecording)" class="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm shadow-sm">
+                                        <i class="fas fa-trash mr-1"></i> Delete
                                     </button>
                                 </div>
-                            </li>
-                        </ul>
+                            </div>
+                             <div class="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-700 mb-2">Transcription</h4>
+                                    <div v-if="selectedRecording.status === 'COMPLETED'" class="h-96 overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar">
+                                        <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'No transcription available.' }</pre>
+                                    </div>
+                                    <div v-else-if="selectedRecording.status === 'FAILED'" class="h-96 overflow-y-auto p-4 bg-red-50 rounded border border-red-200 text-sm text-red-700 custom-scrollbar">
+                                        <p class="font-medium mb-2">Transcription Failed:</p>
+                                        <pre class="whitespace-pre-wrap font-sans">${ selectedRecording.transcription || 'An unknown error occurred.' }</pre>
+                                    </div>
+                                    <div v-else class="h-96 flex items-center justify-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-500">
+                                        <i class="fas fa-spinner fa-spin mr-2"></i> Transcription in progress...
+                                    </div>
+                                </div>
+                                <div class="space-y-4">
+                                    <div>
+                                        <h4 class="font-semibold text-gray-700 mb-2">Audio Player</h4>
+                                        <audio controls class="w-full" :key="selectedRecording.id" :src="'/audio/' + selectedRecording.id">
+                                            Your browser does not support the audio element.
+                                        </audio>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-gray-700 mb-1">Participants</h4>
+                                        <p class="text-sm bg-gray-50 p-3 rounded border border-gray-200 min-h-[40px]">${ selectedRecording.participants || 'None specified' }</p>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-gray-700 mb-1">Notes</h4>
+                                        <pre class="text-sm bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap h-40 overflow-y-auto custom-scrollbar font-sans">${ selectedRecording.notes || 'No notes' }</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                         <div v-else class="flex flex-col items-center justify-center text-center text-gray-500 flex-grow">
+                             <i class="fas fa-hand-pointer text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-lg font-medium mb-2">Select a recording from the list to view details.</p>
+                            <p>Or, drag and drop an audio file anywhere on this page to upload.</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div v-if="selectedRecording" class="lg:col-span-3 bg-white p-6 rounded-lg shadow">
-                 <div class="flex justify-between items-start mb-4 border-b pb-3">
-                     <div>
-                        <h3 class="text-xl font-semibold">${ selectedRecording.title }</h3>
-                         <p class="text-sm text-gray-500">Created: ${ new Date(selectedRecording.created_at).toLocaleString() } (${ formatFileSize(selectedRecording.file_size) })</p>
-                         <span v-if="selectedRecording.status === 'PROCESSING' || selectedRecording.status === 'PENDING'" class="mt-1 inline-block px-2 py-0.5 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">Status: Processing</span>
-                         <span v-else-if="selectedRecording.status === 'FAILED'" class="mt-1 inline-block px-2 py-0.5 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Status: Failed</span>
-                         <span v-else-if="selectedRecording.status === 'COMPLETED'" class="mt-1 inline-block px-2 py-0.5 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Status: Completed</span>
-                     </div>
-                    <div class="flex space-x-2 flex-shrink-0">
-                        <button @click="editRecording(selectedRecording)"
-                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
-                            <i class="fas fa-edit mr-1"></i> Edit Details
-                        </button>
-                        <button @click="confirmDelete(selectedRecording)"
-                                class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
-                            <i class="fas fa-trash mr-1"></i> Delete
-                        </button>
+            <div v-if="currentView === 'upload'"
+                 class="flex-grow flex items-center justify-center p-4">
+                 <div class="w-full max-w-lg bg-white p-8 rounded-xl shadow-lg border border-gray-200 text-center"
+                      @dragover.prevent="dragover = true"
+                      @dragleave.prevent="dragover = false"
+                      @drop.prevent="handleDrop"
+                     :class="{'border-blue-500 bg-blue-50': dragover}">
+
+                    <div v-if="isProcessing" class="space-y-4 py-8">
+                        <div class="animate-spin mx-auto h-12 w-12">
+                            <i class="fas fa-circle-notch text-4xl text-blue-500"></i>
+                        </div>
+                        <h2 class="text-xl font-semibold text-gray-700 mb-2">Processing your audio...</h2>
+                        <p class="text-sm text-gray-600">${ processingStatus.message }</p>
+                         <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4 max-w-sm mx-auto">
+                            <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" :style="{ width: processingStatus.progress + '%' }"></div>
+                        </div>
                     </div>
+
+                    <div v-else class="py-8">
+                        <i class="fas fa-cloud-upload-alt text-5xl mb-5 text-blue-500"></i>
+                        <h2 class="text-xl font-semibold text-gray-700 mb-2">Upload New Recording</h2>
+                        <p class="text-gray-500 mb-4">Drag & drop your audio file here or click below.</p>
+                        <input type="file" @change="handleFileSelect" accept="audio/*" class="hidden" ref="fileInput">
+                        <button @click="$refs.fileInput.click()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition duration-150 ease-in-out">
+                            <i class="fas fa-file-import mr-2"></i> Select File
+                        </button>
+                        <p class="text-xs text-gray-400 mt-4">Max file size: ${ maxFileSizeMB } MB</p>
+                    </div>
+                 </div>
+            </div>
+
+
+            <div v-if="currentView === 'input' && currentRecording" class="bg-white p-6 md:p-8 rounded-lg shadow-md border border-gray-200">
+                <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+                     <h2 class="text-2xl font-semibold text-gray-800">Transcription Complete</h2>
+                    <button @click="switchToGalleryView" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-150 ease-in-out">
+                       <i class="fas fa-arrow-left mr-2"></i> Back to Gallery
+                    </button>
                 </div>
-                <div class="grid md:grid-cols-2 gap-8">
+                 <div class="grid md:grid-cols-2 gap-8">
                     <div>
-                        <h4 class="font-medium mb-2">Transcription</h4>
-                        <div v-if="selectedRecording.status === 'COMPLETED'" class="h-96 overflow-y-auto p-4 bg-gray-50 rounded border text-sm">
-                             <pre class="whitespace-pre-wrap">${ selectedRecording.transcription || 'No transcription available.' }</pre>
+                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Transcription</h3>
+                        <div class="h-96 overflow-y-auto p-4 bg-gray-50 rounded border border-gray-200 text-sm custom-scrollbar">
+                             <pre class="whitespace-pre-wrap font-sans">${ currentRecording.transcription || 'Transcription not available.' }</pre>
                         </div>
-                         <div v-else-if="selectedRecording.status === 'FAILED'" class="h-96 overflow-y-auto p-4 bg-red-50 rounded border text-sm text-red-700">
-                             <p><strong>Transcription Failed:</strong></p>
-                             <pre class="whitespace-pre-wrap mt-2">${ selectedRecording.transcription || 'An unknown error occurred.' }</pre>
-                         </div>
-                         <div v-else class="h-96 flex items-center justify-center p-4 bg-gray-50 rounded border text-gray-500">
-                             <i class="fas fa-spinner fa-spin mr-2"></i> Transcription in progress...
-                         </div>
                     </div>
-                    <div class="space-y-4">
-                        <div>
-                            <h4 class="font-medium mb-2">Audio Player</h4>
-                            <audio controls class="w-full" :key="selectedRecording.id" :src="'/audio/' + selectedRecording.id">
-                                Your browser does not support the audio element.
-                            </audio>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Add Recording Details</h3>
+                        <div class="space-y-4">
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                <input v-model="currentRecording.title"
+                                       @input="autoSave"
+                                       placeholder="Enter a title for this recording"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Participants</label>
+                                <input v-model="currentRecording.participants"
+                                       @input="autoSave"
+                                       placeholder="e.g., John Doe, Jane Smith"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                                <textarea v-model="currentRecording.notes"
+                                          @input="autoSave"
+                                          placeholder="Add any relevant notes here..."
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                          rows="5"></textarea>
+                            </div>
+                             <div class="text-sm text-gray-500 pt-2">
+                                 <p>File Size: ${ formatFileSize(currentRecording.file_size) }</p>
+                                 <p>Created: ${ new Date(currentRecording.created_at).toLocaleString() }</p>
+                                 <p class="text-green-600 font-medium mt-2">Details are auto-saved.</p>
+                             </div>
                         </div>
-                        <div>
-                            <h4 class="font-medium mb-1">Participants</h4>
-                            <p class="text-sm bg-gray-50 p-2 rounded border">${ selectedRecording.participants || 'None specified' }</p>
-                        </div>
-                        <div>
-                            <h4 class="font-medium mb-1">Notes</h4>
-                            <pre class="text-sm bg-gray-50 p-2 rounded border whitespace-pre-wrap h-40 overflow-y-auto">${ selectedRecording.notes || 'No notes' }</pre>
-                        </div>
-
                     </div>
                 </div>
             </div>
-             <div v-else class="lg:col-span-3 flex items-center justify-center bg-white p-6 rounded-lg shadow text-gray-500">
-                Select a recording from the list to view details.
-            </div>
-        </div>
 
-        <div v-if="showEditModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
-                <h3 class="text-lg font-semibold mb-4">Edit Recording Details</h3>
+        </main>
+
+         <footer class="text-center py-4 mt-8 text-xs text-gray-400 border-t border-gray-200">
+            Audio Transcription App &copy; ${ new Date().getFullYear() }
+         </footer>
+
+        <div v-if="showEditModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+             <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                 <div class="flex justify-between items-center mb-4">
+                     <h3 class="text-xl font-semibold text-gray-800">Edit Recording Details</h3>
+                     <button @click="cancelEdit" class="text-gray-400 hover:text-gray-600">&times;</button>
+                 </div>
                 <div v-if="editingRecording" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Title</label>
-                        <input v-model="editingRecording.title"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input v-model="editingRecording.title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Participants</label>
-                        <input v-model="editingRecording.participants"
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Participants</label>
+                        <input v-model="editingRecording.participants" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Notes</label>
-                        <textarea v-model="editingRecording.notes"
-                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                  rows="4"></textarea>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <textarea v-model="editingRecording.notes" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 focus:ring-opacity-50" rows="4"></textarea>
                     </div>
-                    <div class="flex justify-end space-x-2 pt-4">
-                        <button @click="cancelEdit"
-                                class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                            Cancel
-                        </button>
-                        <button @click="saveEdit"
-                                class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                            Save Changes
-                        </button>
+                    <div class="flex justify-end space-x-3 pt-4">
+                         <button @click="cancelEdit" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</button>
+                        <button @click="saveEdit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Changes</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white p-6 rounded-lg shadow-lg max-w-sm">
-                <h3 class="text-lg font-semibold mb-4">Confirm Delete</h3>
-                 <p v-if="recordingToDelete" class="mb-2">Are you sure you want to delete the recording titled "<strong>${ recordingToDelete.title }</strong>"?</p>
-                <p class="text-sm text-gray-600 mb-4">This action cannot be undone and will delete both the record and the audio file.</p>
-                <div class="flex justify-end space-x-2">
-                    <button @click="cancelDelete"
-                            class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                        Cancel
-                    </button>
-                    <button @click="deleteRecording"
-                            class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                        Delete Permanently
-                    </button>
+        <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Confirm Delete</h3>
+                <p v-if="recordingToDelete" class="mb-2 text-gray-600">Are you sure you want to permanently delete the recording titled "<strong>${ recordingToDelete.title }</strong>"?</p>
+                <p class="text-sm text-red-600 mb-6">This action cannot be undone and will delete both the record and the audio file.</p>
+                <div class="flex justify-end space-x-3">
+                    <button @click="cancelDelete" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancel</button>
+                    <button @click="deleteRecording" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Delete Permanently</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const { createApp, ref, reactive, computed, onMounted, watch } = Vue
+        const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue
 
         createApp({
             setup() {
-                const currentView = ref('gallery'); // Start with gallery
+                const currentView = ref('gallery'); // Default view is now gallery
                 const dragover = ref(false);
                 const currentRecording = ref(null); // For the input view after upload
                 const recordings = ref([]); // Full list for gallery
                 const selectedRecording = ref(null); // For gallery detail view
                 const showEditModal = ref(false);
                 const showDeleteModal = ref(false);
-                const editingRecording = ref(null); // Temp object for modal
-                const recordingToDelete = ref(null); // Temp object for modal
+                const editingRecording = ref(null);
+                const recordingToDelete = ref(null);
                 const autoSaveTimeout = ref(null);
-                const isProcessing = ref(false); // Controls upload/processing spinner
+                const isProcessing = ref(false); // Upload/processing spinner
+                const isLoadingRecordings = ref(true); // Loading state for gallery list
                 const processingStatus = reactive({ progress: 0, message: '' });
                 const pollInterval = ref(null);
-                const globalError = ref(null); // For displaying errors to the user
+                const globalError = ref(null);
+                const maxFileSizeMB = ref(250); // Set your max file size here
 
                 // --- Computed Properties ---
                 const groupedRecordings = computed(() => {
+                     // Sort recordings newest first before grouping
+                    const sortedRecordings = [...recordings.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
                     const groups = { today: [], yesterday: [], thisWeek: [], older: [] };
                     const now = new Date();
                     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                     const yesterdayStart = new Date(todayStart);
                     yesterdayStart.setDate(todayStart.getDate() - 1);
+                    // Consider locale for start of week if needed
+                    const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
+                    const daysToSubtract = currentDayOfWeek === 0 ? 6 : currentDayOfWeek -1; // Assuming Monday is start
                     const weekStart = new Date(todayStart);
-                    weekStart.setDate(todayStart.getDate() - now.getDay()); // Assuming Sunday is start of week (0)
+                    weekStart.setDate(todayStart.getDate() - daysToSubtract);
 
-                    recordings.value.forEach(r => {
+                    sortedRecordings.forEach(r => {
                         const date = new Date(r.created_at);
                         if (date >= todayStart) groups.today.push(r);
                         else if (date >= yesterdayStart) groups.yesterday.push(r);
@@ -289,41 +381,54 @@
                         { title: 'Yesterday', items: groups.yesterday },
                         { title: 'This Week', items: groups.thisWeek },
                         { title: 'Older', items: groups.older }
-                    ].filter(g => g.items.length > 0); // Only show groups with items
+                    ].filter(g => g.items.length > 0);
                 });
 
                 // --- Methods ---
-                const setGlobalError = (message) => {
+                const setGlobalError = (message, duration = 7000) => {
                     globalError.value = message;
-                     // Optionally clear the error after some time
-                    setTimeout(() => { globalError.value = null; }, 5000);
+                     if (duration > 0) {
+                        setTimeout(() => { if (globalError.value === message) globalError.value = null; }, duration);
+                    }
                 };
 
-                const formatFileSize = (bytes) => {
-                     if (bytes === 0 || !bytes) return '0 Bytes';
-                     const k = 1024;
-                     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-                     const i = Math.floor(Math.log(bytes) / Math.log(k));
-                     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                 const formatFileSize = (bytes) => {
+                    if (bytes == null || bytes === 0) return '0 Bytes'; // Added null check
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                     if (bytes < 0) bytes = 0; // Handle potential negative values if they occur
+                    const i = Math.max(0, Math.floor(Math.log(bytes) / Math.log(k))); // Ensure i is non-negative
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                 };
 
-                 const switchToUploadView = () => {
-                    currentView.value = 'upload';
-                    selectedRecording.value = null; // Clear selection when switching
-                    isProcessing.value = false; // Ensure processing state is reset
+                 const resetProcessingState = () => {
+                    isProcessing.value = false;
+                    dragover.value = false;
                     processingStatus.message = '';
                     processingStatus.progress = 0;
+                     if (pollInterval.value) {
+                        clearInterval(pollInterval.value);
+                        pollInterval.value = null;
+                    }
+                 };
+
+                 const switchToUploadView = () => {
+                    resetProcessingState();
+                    currentView.value = 'upload';
+                    selectedRecording.value = null;
+                    currentRecording.value = null;
                 };
 
                 const switchToGalleryView = async () => {
-                    await loadRecordings(); // Refresh recordings when going to gallery
+                    resetProcessingState();
                     currentView.value = 'gallery';
-                    currentRecording.value = null; // Clear input view state
-                    isProcessing.value = false; // Ensure processing state is reset
+                    selectedRecording.value = null; // Keep selection or clear? Let's clear for consistency.
+                    currentRecording.value = null;
+                    await loadRecordings(); // Refresh recordings when explicitly switching
                 };
 
                 const handleDrop = (e) => {
-                    dragover.value = false;
+                    dragover.value = false; // Ensure dragover state is reset
                     const file = e.dataTransfer.files[0];
                     if (file && file.type.startsWith('audio/')) {
                         uploadFile(file);
@@ -337,15 +442,26 @@
                     if (file) {
                         uploadFile(file);
                     }
-                    // Reset file input to allow selecting the same file again
-                    e.target.value = null;
+                    e.target.value = null; // Reset input
                 };
 
                 const uploadFile = async (file) => {
-                    globalError.value = null; // Clear previous errors
-                    isProcessing.value = true;
+                    globalError.value = null;
+                    resetProcessingState(); // Clear previous state before new upload
+                    isProcessing.value = true; // Set processing true for the specific upload view spinner
+                    currentView.value = 'upload'; // Switch to upload view to show progress indicator centrally
+                    await nextTick(); // Ensure view updates before fetch starts
+
                     processingStatus.message = 'Preparing upload...';
                     processingStatus.progress = 5;
+
+                     // Check file size client-side (optional but good UX)
+                     if (file.size > maxFileSizeMB.value * 1024 * 1024) {
+                        setGlobalError(`File exceeds the maximum size of ${maxFileSizeMB.value} MB.`);
+                        resetProcessingState();
+                        currentView.value = 'gallery'; // Go back to gallery after error
+                        return;
+                     }
 
                     const formData = new FormData();
                     formData.append('file', file);
@@ -354,46 +470,37 @@
                         processingStatus.message = 'Uploading file...';
                         processingStatus.progress = 10;
 
-                        const response = await fetch('/upload', {
-                            method: 'POST',
-                            body: formData
-                        });
-
+                        const response = await fetch('/upload', { method: 'POST', body: formData });
                         const data = await response.json();
 
                         if (!response.ok) {
-                            // Handle specific errors like 413 Payload Too Large
-                            if (response.status === 413) {
-                                throw new Error(data.error || `File is too large. Maximum size: ${data.max_size_mb?.toFixed(0) || 'N/A'} MB.`);
-                            }
+                            if (response.status === 413) throw new Error(data.error || `File too large. Maximum size: ${data.max_size_mb?.toFixed(0) || maxFileSizeMB.value} MB.`);
                             throw new Error(data.error || `Upload failed with status ${response.status}`);
                         }
 
-                         if (response.status === 202 && data.id) { // 202 Accepted
+                        if (response.status === 202 && data.id) {
                             processingStatus.message = 'Upload complete. Starting transcription...';
                             processingStatus.progress = 30;
-                            // Start polling for the status using the returned recording ID
-                            // await loadRecordings(); // Add the new pending recording to the list
+
+                             // Add to recordings list immediately for gallery view update
                             recordings.value.unshift(data);
+
+                            // Start polling
                             pollProcessingStatus(data.id);
                         } else {
-                             // Should not happen with the new backend logic, but handle defensively
-                             throw new Error('Unexpected response from server after upload.');
+                            throw new Error('Unexpected success response from server after upload.');
                         }
 
                     } catch (error) {
                         console.error('Upload Error:', error);
                         setGlobalError(`Upload failed: ${error.message}`);
-                        isProcessing.value = false;
-                        currentView.value = 'upload'; // Stay on upload view on error
+                        resetProcessingState();
+                        currentView.value = 'gallery'; // Go back to gallery on error
                     }
-                };
+                 };
 
                 const pollProcessingStatus = (recordingId) => {
-                     // Clear any existing interval first
-                     if (pollInterval.value) {
-                        clearInterval(pollInterval.value);
-                    }
+                     if (pollInterval.value) clearInterval(pollInterval.value); // Clear existing before starting new
 
                     processingStatus.message = 'Transcription queued...';
                     processingStatus.progress = 40;
@@ -402,19 +509,16 @@
                         try {
                             console.log(`Polling status for recording ID: ${recordingId}`);
                             const response = await fetch(`/status/${recordingId}`);
-                            if (!response.ok) {
-                                // If record not found (404) or server error, stop polling
-                                throw new Error(`Status check failed with status ${response.status}`);
-                            }
-                            const data = await response.json();
+                            if (!response.ok) throw new Error(`Status check failed with status ${response.status}`);
 
-                            // Update list data if available
+                            const data = await response.json();
                             const index = recordings.value.findIndex(r => r.id === recordingId);
+
+                            // Update item in the main recordings list
                             if (index !== -1) {
                                 recordings.value[index] = data;
-                                // If this is the selected recording, update it too
                                 if(selectedRecording.value?.id === recordingId) {
-                                    selectedRecording.value = data;
+                                    selectedRecording.value = data; // Update selection if viewing details
                                 }
                             }
 
@@ -423,19 +527,22 @@
                                 processingStatus.progress = 100;
                                 clearInterval(pollInterval.value);
                                 pollInterval.value = null;
-                                handleProcessingComplete(data); // Pass the final data
+                                handleProcessingComplete(data);
                             } else if (data.status === 'FAILED') {
                                 processingStatus.message = 'Transcription failed.';
-                                processingStatus.progress = 0; // Indicate failure visually
+                                processingStatus.progress = 100; // Show progress done, but failed
                                 clearInterval(pollInterval.value);
                                 pollInterval.value = null;
-                                setGlobalError(`Transcription failed for "${data.title || 'recording ' + data.id}". Check gallery for details.`);
-                                isProcessing.value = false;
-                                currentView.value = 'gallery'; // Go to gallery to see the failed item
-                                selectRecording(data); // Select the failed item
+                                setGlobalError(`Transcription failed for "${data.title || 'recording ' + data.id}".`);
+                                isProcessing.value = false; // Stop main processing indicator
+                                currentView.value = 'gallery'; // Ensure user is back in gallery
+                                if (!selectedRecording.value && recordings.value.length > 0) {
+                                    // Optionally select the failed item if nothing else is selected
+                                    selectRecording(data);
+                                }
                             } else if (data.status === 'PROCESSING') {
                                 processingStatus.message = 'Transcription in progress...';
-                                processingStatus.progress = 60; // Intermediate progress
+                                processingStatus.progress = 60 + Math.random() * 20; // Simulate some progress
                             } else { // PENDING
                                 processingStatus.message = 'Waiting for transcription to start...';
                                 processingStatus.progress = 45;
@@ -444,117 +551,114 @@
                             console.error('Polling Error:', error);
                             clearInterval(pollInterval.value);
                             pollInterval.value = null;
-                            setGlobalError(`Error checking transcription status: ${error.message}`);
-                            isProcessing.value = false;
-                            // Decide where to navigate the user, maybe back to gallery
+                            setGlobalError(`Error checking transcription status: ${error.message}. Please check the gallery.`);
+                            resetProcessingState();
                             currentView.value = 'gallery';
                         }
-                    }, 3000); // Poll every 3 seconds
-                };
+                    }, 4000); // Poll every 4 seconds
+                 };
 
-                const handleProcessingComplete = (recordingData) => {
-                    // Update the recording list again just in case
+                 const handleProcessingComplete = (recordingData) => {
+                    // Ensure the final data is in the list
                      const index = recordings.value.findIndex(r => r.id === recordingData.id);
-                     if (index !== -1) {
-                         recordings.value[index] = recordingData;
-                     } else {
-                         recordings.value.unshift(recordingData); // Add if somehow missed
-                     }
+                     if (index !== -1) recordings.value[index] = recordingData;
+                     else recordings.value.unshift(recordingData); // Add if missing
 
                      currentRecording.value = recordingData; // Set for the input view
-                     isProcessing.value = false;
-                     currentView.value = 'input'; // Switch to the input view to show result
-                };
+                     resetProcessingState(); // Clear processing state
+                     currentView.value = 'input'; // Switch to the input view
+                 };
 
                 const autoSave = () => {
                     clearTimeout(autoSaveTimeout.value);
                     autoSaveTimeout.value = setTimeout(() => {
-                         // Save only if in 'input' view and have a current recording
                         if (currentView.value === 'input' && currentRecording.value) {
                             saveMetadata(currentRecording.value);
                         }
-                        // No auto-save needed in edit modal (uses explicit save button)
-                    }, 1000); // Save after 1 second of inactivity
+                    }, 1200); // Save after 1.2 seconds
                 };
 
-                 // General function to save metadata (used by autosave and modal save)
                  const saveMetadata = async (recordingDataToSave) => {
-                    globalError.value = null;
-                    if (!recordingDataToSave || !recordingDataToSave.id) return;
-
+                    // ...(keep existing saveMetadata logic)...
+                    // Make sure it updates recordings.value[index] and selectedRecording.value if needed
+                     globalError.value = null;
+                    if (!recordingDataToSave || !recordingDataToSave.id) return null;
                     console.log('Saving metadata for:', recordingDataToSave.id);
                     try {
+                        const payload = {
+                             id: recordingDataToSave.id,
+                             title: recordingDataToSave.title,
+                             participants: recordingDataToSave.participants,
+                             notes: recordingDataToSave.notes
+                         };
                         const response = await fetch('/save', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                id: recordingDataToSave.id,
-                                title: recordingDataToSave.title,
-                                participants: recordingDataToSave.participants,
-                                notes: recordingDataToSave.notes
-                            })
+                            body: JSON.stringify(payload)
                         });
                         const data = await response.json();
-                        if (!response.ok) {
-                            throw new Error(data.error || 'Failed to save metadata');
-                        }
+                        if (!response.ok) throw new Error(data.error || 'Failed to save metadata');
+
                         console.log('Save successful:', data.recording.id);
-                        // Update the recording in the main list
                         const index = recordings.value.findIndex(r => r.id === data.recording.id);
                         if (index !== -1) {
-                            recordings.value[index] = { ...recordings.value[index], ...data.recording }; // Merge updates
-                             // If the updated item is the selected one in gallery, update it there too
-                            if (selectedRecording.value?.id === data.recording.id) {
-                                selectedRecording.value = { ...selectedRecording.value, ...data.recording };
-                            }
+                            // Preserve existing transcription/status, only update metadata fields
+                             recordings.value[index] = { ...recordings.value[index], ...payload };
                         }
-                        return data.recording; // Return updated data
+                         if (selectedRecording.value?.id === data.recording.id) {
+                             selectedRecording.value = { ...selectedRecording.value, ...payload };
+                         }
+                        if (currentRecording.value?.id === data.recording.id) {
+                             currentRecording.value = { ...currentRecording.value, ...payload };
+                         }
+                        return data.recording; // Return raw response data if needed elsewhere
                     } catch (error) {
                         console.error('Save Metadata Error:', error);
                         setGlobalError(`Save failed: ${error.message}`);
-                        return null; // Indicate failure
+                        return null;
                     }
-                };
+                 };
+
 
                 const loadRecordings = async () => {
                     globalError.value = null;
+                    isLoadingRecordings.value = true;
                     try {
                         const response = await fetch('/recordings');
                         const data = await response.json();
-                        if (!response.ok) {
-                             throw new Error(data.error || 'Failed to load recordings');
-                        }
+                        if (!response.ok) throw new Error(data.error || 'Failed to load recordings');
+
                         recordings.value = data;
 
-                         // Check if any recordings are still processing and start polling for them
+                        // Check for any recordings stuck in processing state on load
                          recordings.value.forEach(r => {
-                             if ((r.status === 'PENDING' || r.status === 'PROCESSING') && !isProcessing.value) {
-                                 // Avoid multiple pollers if one is already running from upload
-                                 console.log(`Found pending/processing recording on load: ${r.id}. Starting poll.`);
-                                 // Note: This might start multiple pollers if called frequently.
-                                 // A more robust solution would track active pollers.
+                            // Resume polling only if no other polling is active
+                             if ((r.status === 'PENDING' || r.status === 'PROCESSING') && !pollInterval.value && !isProcessing.value) {
+                                 console.log(`Resuming poll for recording ${r.id} found in state ${r.status}`);
+                                 isProcessing.value = true; // Set global processing flag to show some indicator if needed
+                                 processingStatus.message = `Resuming check for ${r.title}...`;
                                  pollProcessingStatus(r.id);
+                                 // Note: This only resumes one at a time. A more complex system
+                                 // would track multiple background tasks.
                              }
                          });
 
                     } catch (error) {
                         console.error('Load Recordings Error:', error);
                         setGlobalError(`Failed to load recordings: ${error.message}`);
-                        recordings.value = []; // Clear list on error
+                        recordings.value = [];
+                    } finally {
+                         isLoadingRecordings.value = false;
                     }
                 };
 
                 const selectRecording = (recording) => {
-                    selectedRecording.value = recording;
-                    // If the selected recording is processing, ensure polling is active
-                    if ((recording.status === 'PENDING' || recording.status === 'PROCESSING') && !isProcessing.value) {
-                        pollProcessingStatus(recording.id);
-                    }
+                     selectedRecording.value = recording;
+                    // Check status and potentially start polling if needed (handled by loadRecordings now)
                 };
 
                 const editRecording = (recording) => {
-                    // Create a deep copy for editing to avoid modifying the original object directly
-                    editingRecording.value = JSON.parse(JSON.stringify(recording));
+                    editingRecording.value = JSON.parse(JSON.stringify(recording)); // Deep copy
                     showEditModal.value = true;
                 };
 
@@ -564,17 +668,12 @@
                 };
 
                 const saveEdit = async () => {
-                    const updatedRecording = await saveMetadata(editingRecording.value);
-                     if (updatedRecording) { // Check if save was successful
-                         // Update the selected recording if it's the one being edited
-                         if (selectedRecording.value?.id === updatedRecording.id) {
-                             selectedRecording.value = updatedRecording;
-                         }
-                         cancelEdit(); // Close modal
-                     } else {
-                         // Keep modal open if save failed, error is shown via setGlobalError
+                     const updatedRecordingData = await saveMetadata(editingRecording.value);
+                     if (updatedRecordingData) {
+                         cancelEdit(); // Close modal on success
                      }
-                };
+                     // Keep modal open on failure, error shown via globalError
+                 };
 
                 const confirmDelete = (recording) => {
                     recordingToDelete.value = recording;
@@ -587,92 +686,59 @@
                  };
 
                 const deleteRecording = async () => {
-                    globalError.value = null;
+                    // ...(keep existing deleteRecording logic)...
+                     globalError.value = null;
                     if (!recordingToDelete.value) return;
-
                     const idToDelete = recordingToDelete.value.id;
                     try {
-                        const response = await fetch(`/recording/${idToDelete}`, {
-                            method: 'DELETE'
-                        });
+                        const response = await fetch(`/recording/${idToDelete}`, { method: 'DELETE' });
                         const data = await response.json();
-                        if (!response.ok) {
-                            throw new Error(data.error || 'Failed to delete recording');
-                        }
+                        if (!response.ok) throw new Error(data.error || 'Failed to delete recording');
 
-                        // Remove from recordings list
                         recordings.value = recordings.value.filter(r => r.id !== idToDelete);
-
-                        // Clear selected recording if it was deleted
-                        if (selectedRecording.value?.id === idToDelete) {
-                            selectedRecording.value = null;
-                        }
-
-                        cancelDelete(); // Close modal
+                        if (selectedRecording.value?.id === idToDelete) selectedRecording.value = null;
+                        cancelDelete();
                     } catch (error) {
                         console.error('Delete Error:', error);
                         setGlobalError(`Failed to delete recording: ${error.message}`);
-                         // Keep modal open on error? Or close? Let's close it.
-                         cancelDelete();
+                        cancelDelete(); // Still close modal on error
                     }
-                };
+                 };
 
                 // --- Lifecycle Hooks ---
                 onMounted(() => {
-                    loadRecordings(); // Load recordings when the app mounts
-                    // Set default view
-                    currentView.value = 'gallery';
+                    loadRecordings();
+                    // Set max file size from backend config if available? For now, hardcoded.
+                    // fetch('/config').then(res => res.json()).then(cfg => maxFileSizeMB.value = cfg.max_size_mb);
                 });
 
-                 // Watch for view changes to potentially stop polling if navigating away from processing view
-                 watch(currentView, (newView, oldView) => {
-                     if (newView !== 'upload' && newView !== 'input' && pollInterval.value) {
-                        // If navigating away from upload/input views while polling, consider stopping it
-                        // Or let it run in the background? For now, let's let it run.
-                        // console.log("Navigated away, polling continues in background.");
-                     }
-                      if (newView === 'gallery' && oldView !== 'gallery') {
-                         loadRecordings(); // Refresh gallery when navigating to it
+                // --- Watchers ---
+                 watch(currentView, (newView) => {
+                     // Clear selection when leaving gallery? Maybe not necessary.
+                     // Clear errors when changing view?
+                     // globalError.value = null;
+
+                    // If navigating away while processing an upload, keep polling but hide main spinner
+                     if (newView !== 'upload' && isProcessing.value) {
+                        // Allow polling to continue, but the main view spinner won't be visible
                      }
                  });
 
-
                 return {
-                    currentView,
-                    dragover,
-                    currentRecording,
-                    recordings,
-                    selectedRecording,
-                    showEditModal,
-                    showDeleteModal,
-                    editingRecording,
-                    recordingToDelete,
-                    isProcessing,
-                    processingStatus,
-                    globalError,
+                    // State
+                    currentView, dragover, currentRecording, recordings, selectedRecording,
+                    showEditModal, showDeleteModal, editingRecording, recordingToDelete,
+                    isProcessing, isLoadingRecordings, processingStatus, globalError, maxFileSizeMB,
+                    // Computed
                     groupedRecordings,
-                    handleDrop,
-                    handleFileSelect,
-                    uploadFile,
-                    // pollProcessingStatus, // Not directly called from template
-                    // handleProcessingComplete, // Not directly called
-                    autoSave,
-                    // saveMetadata, // Internal helper
-                    loadRecordings,
-                    selectRecording,
-                    editRecording,
-                    cancelEdit,
-                    saveEdit,
-                    confirmDelete,
-                    cancelDelete,
-                    deleteRecording,
-                    switchToUploadView,
-                    switchToGalleryView,
-                    formatFileSize,
-                    setGlobalError
+                    // Methods
+                    handleDrop, handleFileSelect, uploadFile, autoSave, loadRecordings,
+                    selectRecording, editRecording, cancelEdit, saveEdit, confirmDelete,
+                    cancelDelete, deleteRecording, switchToUploadView, switchToGalleryView,
+                    formatFileSize, setGlobalError
                 }
             },
-            delimiters: ['${', '}'] // Keep custom delimiters
+            delimiters: ['${', '}']
         }).mount('#app');
     </script>
 
