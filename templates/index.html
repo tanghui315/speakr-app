@@ -118,6 +118,79 @@
          .copyable {
              position: relative;
          }
+         
+         /* Markdown styling */
+         .ai-message h1, .ai-message h2, .ai-message h3, 
+         .summary-box h1, .summary-box h2, .summary-box h3 {
+             font-weight: 600;
+             margin-top: 1rem;
+             margin-bottom: 0.5rem;
+         }
+         
+         .ai-message h1, .summary-box h1 { font-size: 1.25rem; }
+         .ai-message h2, .summary-box h2 { font-size: 1.15rem; }
+         .ai-message h3, .summary-box h3 { font-size: 1.05rem; }
+         
+         .ai-message p, .summary-box p {
+             margin-bottom: 0.75rem;
+         }
+         
+         .ai-message ul, .ai-message ol,
+         .summary-box ul, .summary-box ol {
+             margin-left: 1.5rem;
+             margin-bottom: 0.75rem;
+         }
+         
+         .ai-message ul, .summary-box ul { list-style-type: disc; }
+         .ai-message ol, .summary-box ol { list-style-type: decimal; }
+         
+         .ai-message code, .summary-box code {
+             background-color: #f1f1f1;
+             padding: 0.1rem 0.3rem;
+             border-radius: 0.25rem;
+             font-family: monospace;
+             font-size: 0.9em;
+         }
+         
+         .ai-message pre, .summary-box pre {
+             background-color: #f1f1f1;
+             padding: 0.75rem;
+             border-radius: 0.25rem;
+             overflow-x: auto;
+             margin-bottom: 0.75rem;
+         }
+         
+         .ai-message pre code, .summary-box pre code {
+             background-color: transparent;
+             padding: 0;
+             border-radius: 0;
+         }
+         
+         .ai-message table, .summary-box table {
+             border-collapse: collapse;
+             width: 100%;
+             margin-bottom: 0.75rem;
+         }
+         
+         .ai-message th, .ai-message td,
+         .summary-box th, .summary-box td {
+             border: 1px solid #ddd;
+             padding: 0.5rem;
+             text-align: left;
+         }
+         
+         .ai-message th, .summary-box th {
+             background-color: #f1f1f1;
+             font-weight: 600;
+         }
+         
+         .ai-message blockquote, .summary-box blockquote {
+             border-left: 4px solid #ddd;
+             padding-left: 1rem;
+             margin-left: 0;
+             margin-bottom: 0.75rem;
+             color: #666;
+         }
 
     </style>
 </head>
@@ -268,11 +341,9 @@
                                     <div>
                                         <h4 class="font-semibold text-gray-700 mb-2 flex-shrink-0">Summary</h4>
                                         <div class="flex-grow overflow-hidden">
-                                            <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar">
-                                                ${ selectedRecording.summary || 'No summary generated.' }
+                                            <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
                                             </div>
-                                            <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-red-700 custom-scrollbar">
-                                                ${ selectedRecording.summary || 'Summary generation failed or was skipped.' }
+                                            <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-red-700 custom-scrollbar" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
                                             </div>
                                             <div v-else class="h-24 flex items-center justify-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-500">
                                                 <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
@@ -301,7 +372,8 @@
                                                 </div>
                                                 <div v-for="(message, index) in chatMessages" :key="index" class="message" :class="message.role === 'user' ? 'user-message' : 'ai-message'">
                                                     <div class="flex justify-between items-start">
-                                                        <div class="flex-grow">${ message.content }</div>
+                                                        <div class="flex-grow" v-if="message.role === 'user'">${ message.content }</div>
+                                                        <div class="flex-grow" v-else v-html="message.html || message.content"></div>
                                                         <button v-if="message.role === 'assistant'" @click="copyMessage(message.content)" class="ml-2 text-gray-400 hover:text-gray-600" title="Copy response">
                                                             <i class="fas fa-copy text-xs"></i>
                                                         </button>
@@ -340,7 +412,7 @@
                                     
                                     <div class="flex flex-col overflow-hidden">
                                         <h4 class="font-semibold text-gray-700 mb-1">Notes</h4>
-                                        <pre class="text-sm bg-gray-50 p-3 rounded border border-gray-200 whitespace-pre-wrap h-40 overflow-y-auto custom-scrollbar font-sans">${ selectedRecording.notes || 'No notes' }</pre>
+                                        <div class="text-sm bg-gray-50 p-3 rounded border border-gray-200 h-40 overflow-y-auto custom-scrollbar" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
                                     </div>
                                 </div>
                             </div>
@@ -1099,7 +1171,11 @@
                         const data = await response.json();
                         if (!response.ok) throw new Error(data.error || 'Failed to get chat response');
                         
-                        chatMessages.value.push({ role: 'assistant', content: data.response });
+                        chatMessages.value.push({ 
+                            role: 'assistant', 
+                            content: data.response,
+                            html: data.response_html 
+                        });
                     } catch (error) {
                         console.error('Chat Error:', error);
                         setGlobalError(`Chat error: ${error.message}`);

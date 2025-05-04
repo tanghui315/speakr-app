@@ -1,7 +1,7 @@
 # app.py
 import os
 import sys
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Markup
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from openai import OpenAI # Keep using the OpenAI library
@@ -13,9 +13,25 @@ import threading
 from dotenv import load_dotenv # Import load_dotenv
 import httpx 
 import re
+import markdown
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Helper function to convert markdown to HTML
+def md_to_html(text):
+    if not text:
+        return ""
+    # Convert markdown to HTML with extensions for tables, code highlighting, etc.
+    html = markdown.markdown(text, extensions=[
+        'tables',           # Support for tables
+        'fenced_code',      # Support for ```code blocks```
+        'codehilite',       # Syntax highlighting for code blocks
+        'nl2br',            # Convert newlines to <br> tags
+        'sane_lists',       # Better list handling
+        'smarty'            # Smart quotes, dashes, etc.
+    ])
+    return html
 
 app = Flask(__name__)
 # Ensure the path uses the directory structure from your setup script
@@ -51,8 +67,10 @@ class Recording(db.Model):
             'title': self.title,
             'participants': self.participants,
             'notes': self.notes,
+            'notes_html': md_to_html(self.notes) if self.notes else "",
             'transcription': self.transcription,
-            'summary': self.summary, # <-- ADDED: Include summary
+            'summary': self.summary,
+            'summary_html': md_to_html(self.summary) if self.summary else "",
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'file_size': self.file_size
@@ -292,8 +310,12 @@ Additional context and notes about the meeting:
             
             response_content = completion.choices[0].message.content
             
+            # Convert markdown in the response to HTML
+            response_html = md_to_html(response_content)
+            
             return jsonify({
                 'response': response_content,
+                'response_html': response_html,
                 'success': True
             })
             
