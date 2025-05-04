@@ -11,7 +11,7 @@ from sqlalchemy import select
 import threading # Import threading
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/transcriptions.db' # Make sure path is correct
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////opt/transcription-app/instance/transcriptions.db' # Make sure path is correct
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250MB max file size
 db = SQLAlchemy()
@@ -19,7 +19,7 @@ db.init_app(app)
 
 # Ensure upload and instance directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')), exist_ok=True)
+# os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')), exist_ok=True)
 
 
 # --- Database Models ---
