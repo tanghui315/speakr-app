@@ -1159,12 +1159,22 @@
                     }
                     
                     try {
+                        // Prepare message history for the API call
+                        // We need to convert our UI messages to the format expected by the API
+                        const messageHistory = chatMessages.value
+                            .slice(0, -1) // Exclude the message we just added (it will be sent separately)
+                            .map(msg => ({
+                                role: msg.role,
+                                content: msg.content
+                            }));
+                        
                         const response = await fetch('/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 recording_id: selectedRecording.value.id,
-                                message: message
+                                message: message,
+                                message_history: messageHistory
                             })
                         });
                         

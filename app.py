@@ -266,6 +266,7 @@ def chat_with_transcription():
         
         recording_id = data.get('recording_id')
         user_message = data.get('message')
+        message_history = data.get('message_history', [])
         
         if not recording_id:
             return jsonify({'error': 'No recording ID provided'}), 400
@@ -298,12 +299,19 @@ Additional context and notes about the meeting:
         
         # Call the LLM
         try:
+            # Prepare messages array with system prompt and conversation history
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # Add message history if provided
+            if message_history:
+                messages.extend(message_history)
+            
+            # Add the current user message
+            messages.append({"role": "user", "content": user_message})
+            
             completion = client.chat.completions.create(
                 model=openrouter_model_name,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
+                messages=messages,
                 temperature=0.7,
                 max_tokens=1000
             )
