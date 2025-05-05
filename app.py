@@ -412,6 +412,13 @@ Additional context and notes about the meeting:
 # --- Authentication Routes ---
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # Check if registration is allowed
+    allow_registration = os.environ.get('ALLOW_REGISTRATION', 'true').lower() == 'true'
+    
+    if not allow_registration:
+        flash('Registration is currently disabled. Please contact the administrator.', 'danger')
+        return redirect(url_for('login'))
+        
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     
@@ -725,9 +732,12 @@ def index():
     return render_template('index.html')
 
 @app.route('/recordings', methods=['GET'])
-@login_required
 def get_recordings():
     try:
+        # Check if user is logged in
+        if not current_user.is_authenticated:
+            return jsonify([])  # Return empty array if not logged in
+            
         # Filter recordings by the current user
         stmt = select(Recording).where(Recording.user_id == current_user.id).order_by(Recording.created_at.desc())
         recordings = db.session.execute(stmt).scalars().all()
