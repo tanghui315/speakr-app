@@ -1,4 +1,4 @@
-# app.py
+# Speakr - Audio Transcription and Summarization App
 import os
 import sys
 from flask import Flask, render_template, request, jsonify, send_file, Markup
