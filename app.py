@@ -59,6 +59,7 @@ class Recording(db.Model):
     status = db.Column(db.String(50), default='PENDING') # PENDING, PROCESSING, SUMMARIZING, COMPLETED, FAILED
     audio_path = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    meeting_date = db.Column(db.Date, nullable=True) # <-- ADDED: Meeting Date field
     file_size = db.Column(db.Integer)  # Store file size in bytes
 
     def to_dict(self):
@@ -73,6 +74,7 @@ class Recording(db.Model):
             'summary_html': md_to_html(self.summary) if self.summary else "",
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
+            'meeting_date': self.meeting_date.isoformat() if self.meeting_date else None, # <-- ADDED: Include meeting_date
             'file_size': self.file_size
         }
 
@@ -367,6 +369,18 @@ def save_metadata():
         if 'participants' in data: recording.participants = data['participants']
         if 'notes' in data: recording.notes = data['notes']
         if 'summary' in data: recording.summary = data['summary'] # <-- ADDED: Allow saving edited summary
+        if 'meeting_date' in data:
+            try:
+                # Attempt to parse date string (e.g., "YYYY-MM-DD")
+                date_str = data['meeting_date']
+                if date_str:
+                    recording.meeting_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                else:
+                    recording.meeting_date = None # Allow clearing the date
+            except (ValueError, TypeError) as e:
+                app.logger.warning(f"Could not parse meeting_date '{data.get('meeting_date')}': {e}")
+                # Optionally return an error or just ignore the invalid date
+                # return jsonify({'error': f"Invalid date format for meeting_date. Use YYYY-MM-DD."}), 400
 
         # Do not update transcription or status here
         db.session.commit()
@@ -410,7 +424,8 @@ def upload_file():
             # Use filename (without path part) as initial title
             title=f"Recording - {filename}",
             file_size=file_size,
-            status='PENDING' # Explicitly set status
+            status='PENDING', # Explicitly set status
+            meeting_date=datetime.utcnow().date() # <-- ADDED: Default meeting_date to today
         )
         db.session.add(recording)
         db.session.commit()
