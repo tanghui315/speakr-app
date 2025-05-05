@@ -176,7 +176,7 @@
              border-radius: 0.375rem;
              display: flex;
              flex-direction: column;
-             height: 400px;
+             height: 100%;
          }
          
          .chat-messages {
@@ -467,13 +467,13 @@
 
                             <!-- Adjusted Grid: md:grid-cols-5 -> Transcription (2), Right Panel (3) -->
                             <div class="grid md:grid-cols-5 gap-6 flex-grow overflow-hidden">
-                                <!-- Left Column: Participants & Transcription -->
+                                <!-- Left Column: Participants, Transcription, Summary & Notes -->
                                 <div class="md:col-span-2 flex flex-col overflow-hidden space-y-4">
                                     <div>
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-1">Participants</h4>
                                         <p class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] min-h-[40px] text-[var(--text-secondary)]">${ selectedRecording.participants || 'None specified' }</p>
                                     </div>
-                                    <div class="flex-grow">
+                                    <div>
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-2 flex-shrink-0">Transcription</h4>
                                         <div class="transcription-box p-4 bg-[var(--bg-tertiary)] rounded border border-[var(--border-primary)] text-sm custom-scrollbar relative text-[var(--text-secondary)]">
                                             <button @click="copyTranscription($event)" class="copy-btn bg-[var(--bg-secondary)]/80 border-[var(--border-primary)] text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]" title="Copy to clipboard">
@@ -491,9 +491,43 @@
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    <!-- Tabs for Summary and Notes (Moved from right column) -->
+                                    <div class="flex flex-col overflow-hidden">
+                                        <div class="border-b border-[var(--border-primary)]">
+                                            <nav class="-mb-px flex space-x-4" aria-label="Tabs">
+                                                <button @click="selectedTab = 'summary'" 
+                                                        :class="selectedTab === 'summary' ? 'border-[var(--border-focus)] text-[var(--text-accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-secondary)]'"
+                                                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
+                                                    Summary
+                                                </button>
+                                                <button @click="selectedTab = 'notes'" 
+                                                        :class="selectedTab === 'notes' ? 'border-[var(--border-focus)] text-[var(--text-accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-secondary)]'"
+                                                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
+                                                    Notes
+                                                </button>
+                                            </nav>
+                                        </div>
+                                        <div class="pt-4">
+                                            <!-- Summary Panel -->
+                                            <div v-show="selectedTab === 'summary'" class="overflow-hidden">
+                                                <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                </div>
+                                                <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
+                                                </div>
+                                                <div v-else class="h-24 flex items-center justify-center p-4 bg-[var(--bg-tertiary)] rounded border border-[var(--border-primary)] text-[var(--text-muted)]">
+                                                    <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
+                                                </div>
+                                            </div>
+                                            <!-- Notes Panel -->
+                                            <div v-show="selectedTab === 'notes'" class="overflow-hidden">
+                                                <div class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <!-- Right Column: Audio, Chat, Tabs (Summary/Notes) -->
+                                <!-- Right Column: Audio & Chat -->
                                 <div class="md:col-span-3 flex flex-col space-y-4 overflow-hidden">
                                     <div>
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-2">Audio Player</h4>
@@ -508,8 +542,8 @@
                                     <!-- Chat Section (Takes available space) -->
                                     <div class="flex flex-col overflow-hidden flex-grow">
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-2 flex-shrink-0">Chat with Transcript</h4>
-                                        <!-- Increased default height for chat container -->
-                                        <div class="chat-container border-[var(--border-primary)] bg-[var(--bg-secondary)]" style="height: 500px;"> 
+                                        <!-- Chat container with height matching left column -->
+                                        <div class="chat-container border-[var(--border-primary)] bg-[var(--bg-secondary)]"> 
                                             <div class="chat-messages custom-scrollbar" ref="chatMessagesRef">
                                                 <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full text-[var(--text-muted)]">
                                                     <div class="text-center">
@@ -548,40 +582,6 @@
                                                 >
                                                     <i class="fas fa-paper-plane"></i>
                                                 </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Tabs for Summary and Notes -->
-                                    <div class="flex flex-col overflow-hidden">
-                                        <div class="border-b border-[var(--border-primary)]">
-                                            <nav class="-mb-px flex space-x-4" aria-label="Tabs">
-                                                <button @click="selectedTab = 'summary'" 
-                                                        :class="selectedTab === 'summary' ? 'border-[var(--border-focus)] text-[var(--text-accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-secondary)]'"
-                                                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
-                                                    Summary
-                                                </button>
-                                                <button @click="selectedTab = 'notes'" 
-                                                        :class="selectedTab === 'notes' ? 'border-[var(--border-focus)] text-[var(--text-accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-secondary)]'"
-                                                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
-                                                    Notes
-                                                </button>
-                                            </nav>
-                                        </div>
-                                        <div class="pt-4 flex-grow overflow-hidden">
-                                            <!-- Summary Panel -->
-                                            <div v-show="selectedTab === 'summary'" class="flex-grow overflow-hidden">
-                                                <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)]" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
-                                                </div>
-                                                <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)]" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
-                                                </div>
-                                                <div v-else class="h-24 flex items-center justify-center p-4 bg-[var(--bg-tertiary)] rounded border border-[var(--border-primary)] text-[var(--text-muted)]">
-                                                    <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
-                                                </div>
-                                            </div>
-                                            <!-- Notes Panel -->
-                                            <div v-show="selectedTab === 'notes'" class="flex-grow overflow-hidden">
-                                                <div class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] h-40 overflow-y-auto custom-scrollbar text-[var(--text-secondary)]" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
                                             </div>
                                         </div>
                                     </div>
