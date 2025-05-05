@@ -100,6 +100,7 @@ class Recording(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     meeting_date = db.Column(db.Date, nullable=True) # <-- ADDED: Meeting Date field
     file_size = db.Column(db.Integer)  # Store file size in bytes
+    original_filename = db.Column(db.String(500), nullable=True) # Store the original uploaded filename
 
     def to_dict(self):
         return {
@@ -115,6 +116,7 @@ class Recording(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'meeting_date': self.meeting_date.isoformat() if self.meeting_date else None, # <-- ADDED: Include meeting_date
             'file_size': self.file_size,
+            'original_filename': self.original_filename, # <-- ADDED: Include original filename
             'user_id': self.user_id
         }
 
@@ -789,9 +791,10 @@ def upload_file():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        filename = secure_filename(file.filename)
+        original_filename = file.filename # <-- ADDED: Capture original filename
+        safe_filename = secure_filename(original_filename)
         # Ensure filepath uses the configured UPLOAD_FOLDER
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}")
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{safe_filename}")
 
         # Get file size before saving
         file.seek(0, os.SEEK_END)
@@ -808,8 +811,9 @@ def upload_file():
         # Create initial database entry with PENDING status and filename as placeholder title
         recording = Recording(
             audio_path=filepath,
-            # Use filename (without path part) as initial title
-            title=f"Recording - {filename}",
+            original_filename=original_filename, # <-- ADDED: Save original filename
+            # Use original filename (without path part) as initial title
+            title=f"Recording - {original_filename}",
             file_size=file_size,
             status='PENDING', # Explicitly set status
             meeting_date=datetime.utcnow().date(), # <-- ADDED: Default meeting_date to today
@@ -823,7 +827,7 @@ def upload_file():
         thread = threading.Thread(
             target=transcribe_audio_task,
             # Pass original filename for logging clarity
-            args=(app.app_context(), recording.id, filepath, filename)
+            args=(app.app_context(), recording.id, filepath, original_filename) # Pass original_filename here too
         )
         thread.start()
         app.logger.info(f"Background processing thread started for recording ID: {recording.id}")

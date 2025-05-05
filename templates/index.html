@@ -140,15 +140,36 @@
         div[v-if="!editingNotes"] {
             border-radius: 0.75rem !important; /* rounded-xl */
         }
+        .metadata-panel {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 0.5rem; /* rounded-lg */
+            padding: 0.75rem 1rem; /* p-3 px-4 */
+            margin-top: 0.75rem; /* mt-3 */
+            font-size: 0.875rem; /* text-sm */
+            color: var(--text-secondary);
+        }
+        .metadata-panel dt {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.1rem;
+        }
+        .metadata-panel dd {
+            margin-left: 0;
+            margin-bottom: 0.5rem;
+            word-break: break-all; /* Wrap long filenames */
+        }
          .status-badge {
              display: inline-block;
-             padding: 0.25rem 0.75rem; /* px-3 py-1 */
-             font-size: 0.75rem; /* text-xs */
+             padding: 0.15rem 0.6rem; /* Smaller padding */
+             font-size: 0.65rem; /* Smaller text */
              font-weight: 500; /* font-medium */
              border-radius: 9999px; /* rounded-full */
-             margin-top: 0.5rem; /* mt-2 */
+             /* margin-top: 0.5rem; /* mt-2 */ /* Removed margin-top */
              box-shadow: 0 1px 2px rgba(0,0,0,0.05);
              letter-spacing: 0.025em;
+             vertical-align: middle; /* Align with text */
+             margin-left: 0.75rem; /* Add some space */
          }
          .status-processing { color: #1d4ed8; background-color: #dbeafe; } /* text-blue-800 bg-blue-100 */
          .status-summarizing { color: #92400e; background-color: #fef3c7; } /* text-amber-800 bg-amber-100 */
@@ -532,11 +553,14 @@
                                                 </button>
                                             </span>
                                         </span>
-                                        Created: ${ new Date(selectedRecording.created_at).toLocaleString() } | Size: ${ formatFileSize(selectedRecording.file_size) }
+                                        Created: ${ new Date(selectedRecording.created_at).toLocaleString() }
+                                        <!-- Status Badge Moved Here -->
+                                        <span :class="getStatusClass(selectedRecording.status)" class="status-badge">
+                                            ${ formatStatus(selectedRecording.status) }
+                                        </span>
                                     </p>
-                                     <span :class="getStatusClass(selectedRecording.status)" class="status-badge">
-                                        Status: ${ formatStatus(selectedRecording.status) }
-                                     </span>
+                                    <!-- Removed Size from here -->
+                                    <!-- Removed separate Status Badge span -->
                                 </div>
                                 <div class="flex space-x-2 flex-shrink-0">
                                     <button @click="editRecording(selectedRecording)" class="px-3 py-1.5 bg-[var(--bg-button)] text-[var(--text-button)] rounded-md hover:bg-[var(--bg-button-hover)] text-sm shadow-sm">
@@ -627,6 +651,20 @@
                                                 </div>
                                                 <div v-if="!editingNotes" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
                                                 <textarea v-else v-model="selectedRecording.notes" @blur="saveInlineEdit('notes')" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter notes"></textarea>
+                                            </div>
+                                            
+                                            <!-- Metadata Panel -->
+                                            <div class="metadata-panel">
+                                                <dl>
+                                                    <div v-if="selectedRecording.original_filename">
+                                                        <dt>Original Filename</dt>
+                                                        <dd>${ selectedRecording.original_filename }</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt>File Size</dt>
+                                                        <dd>${ formatFileSize(selectedRecording.file_size) }</dd>
+                                                    </div>
+                                                </dl>
                                             </div>
                                         </div>
                                     </div>
