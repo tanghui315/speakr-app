@@ -170,8 +170,8 @@ else:
          app.logger.error(f"Failed to initialize OpenRouter client: {client_init_e}", exc_info=True)
 
 # Store details for the transcription client (potentially different)
-transcription_api_key = os.environ.get("OPENAI_API_KEY", "cant-be-empty")
-transcription_base_url = os.environ.get("OPENAI_BASE_URL", "http://192.168.68.85:1611/v1/")
+transcription_api_key = os.environ.get("TRANSCRIPTION_API_KEY", "cant-be-empty")
+transcription_base_url = os.environ.get("TRANSCRIPTION_BASE_URL", "https://openrouter.ai/api/v1")
 
 app.logger.info(f"Using OpenRouter model for summaries: {openrouter_model_name}")
 
@@ -202,8 +202,10 @@ def transcribe_audio_task(app_context, recording_id, filepath, original_filename
                     base_url=transcription_base_url,
                     http_client=http_client_no_proxy # Reuse the same client configuration
                 )
+                # Get the Whisper model name from environment variables
+                whisper_model = os.environ.get("WHISPER_MODEL", "Systran/faster-distil-whisper-large-v3")
                 transcript = transcription_client.audio.transcriptions.create(
-                    model="Systran/faster-distil-whisper-large-v3", # Your Whisper model
+                    model=whisper_model, # Use model from environment variables
                     file=audio_file,
                     language="en" # Specify language if known
                 )
