@@ -382,13 +382,13 @@
                     <i class="fas fa-images mr-1"></i> Gallery
                 </button>
                 <!-- User dropdown menu -->
-                <div class="relative ml-2" @click.away="isUserMenuOpen = false">
+                <div class="relative ml-2">
                     <button @click="isUserMenuOpen = !isUserMenuOpen" class="flex items-center px-3 py-2 border border-[var(--border-secondary)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-accent)] focus:outline-none">
                         <i class="fas fa-user mr-2"></i>
                         <span>{{ current_user.username }}</span>
                         <i class="fas fa-chevron-down ml-2"></i>
                     </button>
-                    <div v-show="isUserMenuOpen" class="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg z-10">
+                    <div v-if="isUserMenuOpen" class="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg z-10">
                         <a href="{{ url_for('account') }}" class="block px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-accent)]">
                             <i class="fas fa-user-circle mr-2"></i> Account
                         </a>
@@ -856,6 +856,7 @@
     <!-- Toast container for notifications -->
     <div class="toast-container" id="toastContainer"></div>
     
+    {% raw %}
     <script>
         const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue
 
@@ -1332,7 +1333,7 @@
                 };
 
                 const loadRecordings = async () => {
-                     globalError.value = null;
+                    globalError.value = null;
                     isLoadingRecordings.value = true;
                     try {
                         const response = await fetch('/recordings');
@@ -1340,15 +1341,16 @@
                         if (!response.ok) throw new Error(data.error || 'Failed to load recordings');
                         recordings.value = data;
 
-                         // On load, check for any recordings stuck in PENDING, PROCESSING, or SUMMARIZING
-                         // and ensure polling is active if the queue processor isn't running.
-                         const incompleteRecordings = recordings.value.filter(r => ['PENDING', 'PROCESSING', 'SUMMARIZING'].includes(r.status));
 
-                         if (incompleteRecordings.length > 0 && !isProcessingActive.value) {
-                             console.warn(`Found ${incompleteRecordings.length} incomplete recording(s) on load. Attempting to resume polling if not already queued.`);
-                             for (const recording of incompleteRecordings) {
-                                 // Is this item already being tracked in the queue?
-                                 let queueItem = uploadQueue.value.find(item => item.recordingId === recording.id);
+                        // On load, check for any recordings stuck in PENDING, PROCESSING, or SUMMARIZING
+                        // and ensure polling is active if the queue processor isn't running.
+                        const incompleteRecordings = recordings.value.filter(r => ['PENDING', 'PROCESSING', 'SUMMARIZING'].includes(r.status));
+
+                        if (incompleteRecordings.length > 0 && !isProcessingActive.value) {
+                            console.warn(`Found ${incompleteRecordings.length} incomplete recording(s) on load. Attempting to resume polling if not already queued.`);
+                            for (const recording of incompleteRecordings) {
+                                // Is this item already being tracked in the queue?
+                                let queueItem = uploadQueue.value.find(item => item.recordingId === recording.id);
                                 if (!queueItem) {
                                     // If not in queue (likely page reload), create a placeholder to track polling
                                     console.log(`Re-attaching poll for recording ${recording.id}.`);
@@ -1364,31 +1366,31 @@
                                     // Or just manage polling without adding to queue visually?
                                     // Let's add it to the queue for consistency in management.
                                     uploadQueue.value.unshift(queueItem);
-                                     // Start processing queue if it wasn't active
-                                     if (!isProcessingActive.value) {
-                                         startProcessingQueue();
-                                     } else if (currentlyProcessingFile.value?.recordingId !== recording.id) {
-                                         // If processor is active but on a different file, just ensure polling starts
-                                         // Note: startProcessingQueue handles finding the next 'queued'. This item
-                                         // might not be 'queued'. We need direct polling.
-                                         // Let's rethink: The queue processor should handle finding PENDING/PROCESSING items.
-                                         // For simplicity, let's just trigger the queue processor. It will find this item if it's next.
-                                         // If something else is truly processing, this won't interrupt.
-                                         console.log("Triggering queue processor check due to reloaded incomplete item.")
-                                         // Ensure it's marked conceptually 'queued' for the processor to pick up
-                                         queueItem.status = 'queued';
-                                         startProcessingQueue(); // Let the queue logic handle it
-                                     }
+                                    // Start processing queue if it wasn't active
+                                    if (!isProcessingActive.value) {
+                                        startProcessingQueue();
+                                    } else if (currentlyProcessingFile.value?.recordingId !== recording.id) {
+                                        // If processor is active but on a different file, just ensure polling starts
+                                        // Note: startProcessingQueue handles finding the next 'queued'. This item
+                                        // might not be 'queued'. We need direct polling.
+                                        // Let's rethink: The queue processor should handle finding PENDING/PROCESSING items.
+                                        // For simplicity, let's just trigger the queue processor. It will find this item if it's next.
+                                        // If something else is truly processing, this won't interrupt.
+                                        console.log("Triggering queue processor check due to reloaded incomplete item.")
+                                        // Ensure it's marked conceptually 'queued' for the processor to pick up
+                                        queueItem.status = 'queued';
+                                        startProcessingQueue(); // Let the queue logic handle it
+                                    }
 
                                 } else if (queueItem.status !== recording.status && !['completed', 'failed'].includes(queueItem.status)) {
                                     // If queue status differs from DB, update queue status
-                                     console.log(`Correcting queue status for ${queueItem.clientId} from ${queueItem.status} to ${recording.status}`);
-                                     queueItem.status = recording.status;
-                                     // Restart queue processing if needed
-                                     if (!isProcessingActive.value) startProcessingQueue();
-                                 }
+                                    console.log(`Correcting queue status for ${queueItem.clientId} from ${queueItem.status} to ${recording.status}`);
+                                    queueItem.status = recording.status;
+                                    // Restart queue processing if needed
+                                    if (!isProcessingActive.value) startProcessingQueue();
+                                }
                             }
-                         }
+                        }
 
                     } catch (error) {
                         console.error('Load Recordings Error:', error);
@@ -1814,6 +1816,6 @@
             delimiters: ['${', '}'] // Keep Vue delimiters distinct from Flask's Jinja
         }).mount('#app');
     </script>
-
+{% endraw %}
 </body>
 </html>

@@ -451,6 +451,34 @@ def logout():
 def account():
     return render_template('account.html', title='Account')
 
+@app.route('/change_password', methods=['POST'])
+@login_required
+def change_password():
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+    
+    # Validate form data
+    if not current_password or not new_password or not confirm_password:
+        flash('All fields are required.', 'danger')
+        return redirect(url_for('account'))
+    
+    if new_password != confirm_password:
+        flash('New password and confirmation do not match.', 'danger')
+        return redirect(url_for('account'))
+    
+    # Check if current password is correct
+    if not bcrypt.check_password_hash(current_user.password, current_password):
+        flash('Current password is incorrect.', 'danger')
+        return redirect(url_for('account'))
+    
+    # Update password
+    current_user.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+    db.session.commit()
+    
+    flash('Your password has been updated successfully.', 'success')
+    return redirect(url_for('account'))
+
 # --- Admin Routes ---
 @app.route('/admin', methods=['GET'])
 @login_required
