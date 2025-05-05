@@ -74,6 +74,7 @@ if __name__ == "__main__":
 # Add this near the top if you run this standalone often outside app context
 import os
 import sys
+import shutil
 # Add project root to path if necessary for 'app' import
 # sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -100,7 +101,7 @@ except (RuntimeError, AttributeError, KeyError):
         print("Make sure reset_db.py is runnable and PYTHONPATH is set.")
         sys.exit(1)
 
-def reset_database():
+def reset_database(delete_uploads=True):
     # Determine the database path relative to the instance folder
     # Use app config if available
     instance_path = app.instance_path if hasattr(app, 'instance_path') else os.path.join(os.getcwd(), 'instance')
@@ -167,11 +168,147 @@ def reset_database():
         except Exception as rb_e:
              print(f"Rollback attempt failed: {rb_e}")
         sys.exit(1)
+        
+    # Delete all files in the uploads directory if requested
+    if delete_uploads:
+        try:
+            uploads_dir = os.path.join(os.getcwd(), 'uploads')
+            if os.path.exists(uploads_dir):
+                print(f"Deleting all files in uploads directory: {uploads_dir}")
+                for filename in os.listdir(uploads_dir):
+                    file_path = os.path.join(uploads_dir, filename)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            print(f"Deleted file: {file_path}")
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                            print(f"Deleted directory: {file_path}")
+                    except Exception as e:
+                        print(f"Error deleting {file_path}: {e}")
+                print("All files in uploads directory have been deleted.")
+            else:
+                print(f"Uploads directory not found: {uploads_dir}")
+                # Create the directory if it doesn't exist
+                os.makedirs(uploads_dir, exist_ok=True)
+                print(f"Created uploads directory: {uploads_dir}")
+        except Exception as e:
+            print(f"Error cleaning uploads directory: {e}")
 
 if __name__ == "__main__":
-    print("Attempting to reset the database...")
-    reset_database()
+    print("Attempting to reset the database and clean up all data...")
+    reset_database(delete_uploads=True)
     print("Database reset process finished.")
+
+```
+
+
+## migrate_original_filename.py
+
+```python
+
+#!/usr/bin/env python3
+
+import os
+import sys
+from sqlalchemy import inspect
+from sqlalchemy.exc import OperationalError
+
+# Try to import from app context
+try:
+    from flask import current_app
+    app = current_app._get_current_object()
+    with app.app_context():
+        db = app.extensions['sqlalchemy'].db
+except (RuntimeError, AttributeError, KeyError):
+    # If not in app context, import directly
+    try:
+        from app import app, db, Recording
+    except ImportError as e:
+        print(f"Error: Could not import 'app' and 'db': {e}")
+        print("Make sure migrate_original_filename.py is runnable and PYTHONPATH is set.")
+        sys.exit(1)
+
+def migrate_database():
+    """
+    Migrate the database schema to add original_filename column without losing data
+    """
+    print("Starting database migration for original_filename column...")
+    
+    with app.app_context():
+        inspector = inspect(db.engine)
+        
+        # Check if Recording.original_filename column exists
+        recording_columns = [column['name'] for column in inspector.get_columns('recording')]
+        if 'original_filename' not in recording_columns:
+            print("Adding original_filename column to Recording table...")
+            try:
+                # Add original_filename column to Recording table
+                with db.engine.begin() as conn:
+                    conn.execute(db.text("ALTER TABLE recording ADD COLUMN original_filename VARCHAR(500)"))
+                print("original_filename column added successfully!")
+            except OperationalError as e:
+                print(f"Error adding original_filename column: {e}")
+                print("Attempting alternative approach...")
+                try:
+                    # SQLite doesn't support ALTER TABLE ADD COLUMN with foreign keys
+                    # So we need to create a new table, copy data, drop old table, rename new table
+                    
+                    # 1. Create temporary table with new schema
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("""
+                            CREATE TABLE recording_new (
+                                id INTEGER PRIMARY KEY,
+                                title VARCHAR(200),
+                                participants VARCHAR(500),
+                                notes TEXT,
+                                transcription TEXT,
+                                summary TEXT,
+                                status VARCHAR(50),
+                                audio_path VARCHAR(500),
+                                created_at DATETIME,
+                                meeting_date DATE,
+                                file_size INTEGER,
+                                user_id INTEGER REFERENCES user(id),
+                                original_filename VARCHAR(500)
+                            )
+                        """))
+                    
+                    # 2. Copy data from old table to new table
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("""
+                            INSERT INTO recording_new (
+                                id, title, participants, notes, transcription, summary, 
+                                status, audio_path, created_at, meeting_date, file_size, user_id
+                            )
+                            SELECT 
+                                id, title, participants, notes, transcription, summary, 
+                                status, audio_path, created_at, meeting_date, file_size, user_id
+                            FROM recording
+                        """))
+                    
+                    # 3. Drop old table
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("DROP TABLE recording"))
+                    
+                    # 4. Rename new table
+                    with db.engine.begin() as conn:
+                        conn.execute(db.text("ALTER TABLE recording_new RENAME TO recording"))
+                    
+                    print("original_filename column added successfully using table recreation!")
+                except Exception as e2:
+                    print(f"Error during table recreation: {e2}")
+                    sys.exit(1)
+        else:
+            print("original_filename column already exists in Recording table.")
+        
+        print("Database migration completed successfully!")
+
+if __name__ == "__main__":
+    print("Attempting to migrate the database to add original_filename column...")
+    migrate_database()
+    print("Database migration process finished.")
+
 ```
 
 
@@ -379,6 +516,7 @@ class Recording(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     meeting_date = db.Column(db.Date, nullable=True) # <-- ADDED: Meeting Date field
     file_size = db.Column(db.Integer)  # Store file size in bytes
+    original_filename = db.Column(db.String(500), nullable=True) # Store the original uploaded filename
 
     def to_dict(self):
         return {
@@ -394,6 +532,7 @@ class Recording(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'meeting_date': self.meeting_date.isoformat() if self.meeting_date else None, # <-- ADDED: Include meeting_date
             'file_size': self.file_size,
+            'original_filename': self.original_filename, # <-- ADDED: Include original filename
             'user_id': self.user_id
         }
 
@@ -689,6 +828,13 @@ Additional context and notes about the meeting:
 # --- Authentication Routes ---
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # Check if registration is allowed
+    allow_registration = os.environ.get('ALLOW_REGISTRATION', 'true').lower() == 'true'
+    
+    if not allow_registration:
+        flash('Registration is currently disabled. Please contact the administrator.', 'danger')
+        return redirect(url_for('login'))
+        
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     
@@ -1002,9 +1148,12 @@ def index():
     return render_template('index.html')
 
 @app.route('/recordings', methods=['GET'])
-@login_required
 def get_recordings():
     try:
+        # Check if user is logged in
+        if not current_user.is_authenticated:
+            return jsonify([])  # Return empty array if not logged in
+            
         # Filter recordings by the current user
         stmt = select(Recording).where(Recording.user_id == current_user.id).order_by(Recording.created_at.desc())
         recordings = db.session.execute(stmt).scalars().all()
@@ -1068,9 +1217,10 @@ def upload_file():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        filename = secure_filename(file.filename)
+        original_filename = file.filename # <-- ADDED: Capture original filename
+        safe_filename = secure_filename(original_filename)
         # Ensure filepath uses the configured UPLOAD_FOLDER
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}")
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{safe_filename}")
 
         # Get file size before saving
         file.seek(0, os.SEEK_END)
@@ -1087,8 +1237,9 @@ def upload_file():
         # Create initial database entry with PENDING status and filename as placeholder title
         recording = Recording(
             audio_path=filepath,
-            # Use filename (without path part) as initial title
-            title=f"Recording - {filename}",
+            original_filename=original_filename, # <-- ADDED: Save original filename
+            # Use original filename (without path part) as initial title
+            title=f"Recording - {original_filename}",
             file_size=file_size,
             status='PENDING', # Explicitly set status
             meeting_date=datetime.utcnow().date(), # <-- ADDED: Default meeting_date to today
@@ -1102,7 +1253,7 @@ def upload_file():
         thread = threading.Thread(
             target=transcribe_audio_task,
             # Pass original filename for logging clarity
-            args=(app.app_context(), recording.id, filepath, filename)
+            args=(app.app_context(), recording.id, filepath, original_filename) # Pass original_filename here too
         )
         thread.start()
         app.logger.info(f"Background processing thread started for recording ID: {recording.id}")
@@ -2643,7 +2794,7 @@ markdown==3.5.1
             border-radius: 0.75rem; /* rounded-xl */
             border: 1px solid #e5e7eb; /* border-gray-200 */
             min-height: 60px; /* min-h-[60px] or adjust as needed */
-            max-height: 20rem; /* Limit height */
+            /* max-height removed to allow full height */
             overflow-y: auto;
             white-space: pre-wrap;
             font-family: inherit; /* Use body font */
@@ -2661,15 +2812,46 @@ markdown==3.5.1
         div[v-if="!editingNotes"] {
             border-radius: 0.75rem !important; /* rounded-xl */
         }
+        
+        /* Ensure consistent height for tab content boxes */
+        .tab-content-box {
+            height: 200px !important;
+            overflow-y: auto;
+        }
+        .chat-content-box {
+            height: 650px !important;
+            overflow-y: auto;
+        }
+        .metadata-panel {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 0.75rem; /* rounded-xl to match others */
+            padding: 1rem; /* p-4 to be consistent */
+            /* margin-top removed to align with other boxes */
+            font-size: 0.875rem; /* text-sm */
+            color: var(--text-secondary);
+        }
+        .metadata-panel dt {
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.1rem;
+        }
+        .metadata-panel dd {
+            margin-left: 0;
+            margin-bottom: 0.5rem;
+            word-break: break-all; /* Wrap long filenames */
+        }
          .status-badge {
              display: inline-block;
-             padding: 0.25rem 0.75rem; /* px-3 py-1 */
-             font-size: 0.75rem; /* text-xs */
+             padding: 0.15rem 0.6rem; /* Smaller padding */
+             font-size: 0.65rem; /* Smaller text */
              font-weight: 500; /* font-medium */
              border-radius: 9999px; /* rounded-full */
-             margin-top: 0.5rem; /* mt-2 */
+             /* margin-top: 0.5rem; /* mt-2 */ /* Removed margin-top */
              box-shadow: 0 1px 2px rgba(0,0,0,0.05);
              letter-spacing: 0.025em;
+             vertical-align: middle; /* Align with text */
+             margin-left: 0.75rem; /* Add some space */
          }
          .status-processing { color: #1d4ed8; background-color: #dbeafe; } /* text-blue-800 bg-blue-100 */
          .status-summarizing { color: #92400e; background-color: #fef3c7; } /* text-amber-800 bg-amber-100 */
@@ -2706,6 +2888,46 @@ markdown==3.5.1
              background-color: #f3f4f6;
              transform: translateY(-1px);
              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+         }
+         
+         /* Hover edit button styles */
+         .content-box {
+             position: relative;
+         }
+         
+         .hover-edit-btn {
+             position: absolute;
+             top: 10px;
+             right: 10px;
+             background-color: rgba(255, 255, 255, 0.9);
+             border: 1px solid #e5e7eb;
+             border-radius: 0.5rem;
+             padding: 0.35rem 0.75rem;
+             font-size: 0.75rem;
+             cursor: pointer;
+             z-index: 10;
+             transition: all 0.2s ease;
+             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+             opacity: 0;
+         }
+         
+         .content-box:hover .hover-edit-btn {
+             opacity: 1;
+         }
+         
+         .hover-edit-btn:hover {
+             background-color: #f3f4f6;
+             transform: translateY(-1px);
+             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+         }
+         
+         .dark .hover-edit-btn {
+             background-color: rgba(55, 65, 81, 0.9);
+             border-color: #4b5563;
+         }
+         
+         .dark .hover-edit-btn:hover {
+             background-color: #4b5563;
          }
          
          /* Modern chat section styles */
@@ -2902,14 +3124,14 @@ markdown==3.5.1
                     class="px-4 py-2 rounded-lg shadow-sm hover:bg-[var(--bg-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] focus:ring-offset-1 transition duration-150 ease-in-out">
                     <i class="fas fa-images mr-1"></i> Gallery
                 </button>
-<!-- User dropdown menu -->
-<div class="relative ml-2">
-    <button @click="isUserMenuOpen = !isUserMenuOpen" class="flex items-center px-3 py-2 border border-[var(--border-secondary)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-accent)] focus:outline-none">
-        <i class="fas fa-user mr-2"></i>
-        <span>{{ current_user.username }}</span>
-        <i class="fas fa-chevron-down ml-2"></i>
-    </button>
-    <div v-if="isUserMenuOpen" class="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg z-10">
+                <!-- User dropdown menu -->
+                <div class="relative ml-2">
+                    <button @click="isUserMenuOpen = !isUserMenuOpen" class="flex items-center px-3 py-2 border border-[var(--border-secondary)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-accent)] focus:outline-none">
+                        <i class="fas fa-user mr-2"></i>
+                        <span>{{ current_user.username }}</span>
+                        <i class="fas fa-chevron-down ml-2"></i>
+                    </button>
+                    <div v-if="isUserMenuOpen" class="absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg z-10">
                         <a href="{{ url_for('account') }}" class="block px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-accent)]">
                             <i class="fas fa-user-circle mr-2"></i> Account
                         </a>
@@ -3053,11 +3275,14 @@ markdown==3.5.1
                                                 </button>
                                             </span>
                                         </span>
-                                        Created: ${ new Date(selectedRecording.created_at).toLocaleString() } | Size: ${ formatFileSize(selectedRecording.file_size) }
+                                        Created: ${ new Date(selectedRecording.created_at).toLocaleString() }
+                                        <!-- Status Badge Moved Here -->
+                                        <span :class="getStatusClass(selectedRecording.status)" class="status-badge">
+                                            ${ formatStatus(selectedRecording.status) }
+                                        </span>
                                     </p>
-                                     <span :class="getStatusClass(selectedRecording.status)" class="status-badge">
-                                        Status: ${ formatStatus(selectedRecording.status) }
-                                     </span>
+                                    <!-- Removed Size from here -->
+                                    <!-- Removed separate Status Badge span -->
                                 </div>
                                 <div class="flex space-x-2 flex-shrink-0">
                                     <button @click="editRecording(selectedRecording)" class="px-3 py-1.5 bg-[var(--bg-button)] text-[var(--text-button)] rounded-md hover:bg-[var(--bg-button-hover)] text-sm shadow-sm">
@@ -3118,36 +3343,59 @@ markdown==3.5.1
                                                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
                                                     Notes
                                                 </button>
+                                                <button @click="selectedTab = 'metadata'" 
+                                                        :class="selectedTab === 'metadata' ? 'border-[var(--border-focus)] text-[var(--text-accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-secondary)]'"
+                                                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
+                                                    Metadata
+                                                </button>
                                             </nav>
                                         </div>
                                         <div class="pt-4">
                                             <!-- Summary Panel -->
                                             <div v-show="selectedTab === 'summary'" class="overflow-hidden">
-                                                <div class="flex justify-between items-center mb-1">
-                                                    <button @click="toggleEditSummary" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded ml-auto">
-                                                        <i class="fas" :class="editingSummary ? 'fa-check' : 'fa-edit'"></i>
-                                                    </button>
-                                                </div>
                                                 <div v-if="selectedRecording.status === 'COMPLETED'">
-                                                    <div v-if="!editingSummary" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                    <div v-if="!editingSummary" class="content-box">
+                                                        <div class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] tab-content-box" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                        </div>
+                                                        <button @click="toggleEditSummary" class="hover-edit-btn text-[var(--text-muted)] hover:text-[var(--text-accent)]" title="Edit Summary">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
                                                     </div>
-                                                    <textarea v-else v-model="selectedRecording.summary" @blur="saveInlineEdit('summary')" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter summary"></textarea>
+                                                    <textarea v-else v-model="selectedRecording.summary" @blur="saveInlineEdit('summary')" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)] tab-content-box" placeholder="Enter summary"></textarea>
                                                 </div>
-                                                <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
+                                                <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] tab-content-box" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
                                                 </div>
                                                 <div v-else class="h-24 flex items-center justify-center p-4 bg-[var(--bg-tertiary)] rounded border border-[var(--border-primary)] text-[var(--text-muted)]">
                                                     <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
                                                 </div>
+                                                
                                             </div>
+                                            
                                             <!-- Notes Panel -->
                                             <div v-show="selectedTab === 'notes'" class="overflow-hidden">
-                                                <div class="flex justify-between items-center mb-1">
-                                                    <button @click="toggleEditNotes" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded ml-auto">
-                                                        <i class="fas" :class="editingNotes ? 'fa-check' : 'fa-edit'"></i>
+                                                <div v-if="!editingNotes" class="content-box">
+                                                    <div class="text-sm bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] tab-content-box" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
+                                                    <button @click="toggleEditNotes" class="hover-edit-btn text-[var(--text-muted)] hover:text-[var(--text-accent)]" title="Edit Notes">
+                                                        <i class="fas fa-edit"></i>
                                                     </button>
                                                 </div>
-                                                <div v-if="!editingNotes" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
-                                                <textarea v-else v-model="selectedRecording.notes" @blur="saveInlineEdit('notes')" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter notes"></textarea>
+                                                <textarea v-else v-model="selectedRecording.notes" @blur="saveInlineEdit('notes')" class="text-sm bg-[var(--bg-tertiary)] p-4 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)] tab-content-box" placeholder="Enter notes"></textarea>
+                                            </div>
+                                            
+                                            <!-- Metadata Panel (in separate tab) -->
+                                            <div v-show="selectedTab === 'metadata'" class="overflow-hidden">
+                                                <div class="metadata-panel custom-scrollbar tab-content-box">
+                                                    <dl>
+                                                        <div v-if="selectedRecording.original_filename">
+                                                            <dt>Original Filename</dt>
+                                                            <dd>${ selectedRecording.original_filename }</dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt>File Size</dt>
+                                                            <dd>${ formatFileSize(selectedRecording.file_size) }</dd>
+                                                        </div>
+                                                    </dl>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -3169,7 +3417,7 @@ markdown==3.5.1
                                     <div class="flex flex-col overflow-hidden">
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-2 flex-shrink-0">Chat with Transcript</h4>
                                         <!-- Chat container with fixed height matching left column -->
-                                        <div class="chat-container border-[var(--border-primary)] bg-[var(--bg-secondary)]" style="height: 684px;"> 
+                                        <div class="chat-container border-[var(--border-primary)] bg-[var(--bg-secondary)] chat-content-box"> 
                                             <div class="chat-messages custom-scrollbar" ref="chatMessagesRef">
                                                 <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full text-[var(--text-muted)]">
                                                     <div class="text-center">
@@ -3313,18 +3561,23 @@ markdown==3.5.1
             </div>
         </div>
 
-        <div v-if="uploadQueue.length > 0 || currentlyProcessingFile"
+        <div v-if="(uploadQueue.length > 0 || currentlyProcessingFile) && !progressPopupClosed"
              class="progress-popup bg-[var(--bg-secondary)] rounded-lg shadow-xl border border-[var(--border-primary)] overflow-hidden"
              :class="{ 'minimized': progressPopupMinimized }">
 
-            <div class="flex justify-between items-center p-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)] cursor-pointer" @click="progressPopupMinimized = !progressPopupMinimized">
-                <h4 class="text-sm font-semibold text-[var(--text-secondary)]">
+            <div class="flex justify-between items-center p-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+                <h4 class="text-sm font-semibold text-[var(--text-secondary)] cursor-pointer" @click="progressPopupMinimized = !progressPopupMinimized">
                     <i class="fas fa-upload mr-2 text-[var(--text-accent)]"></i>
                     Upload & Process Progress (${ completedInQueue }/${ totalInQueue } completed)
                 </h4>
-                <button class="text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
-                    <i :class="progressPopupMinimized ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas fa-fw"></i>
-                </button>
+                <div class="flex items-center">
+                    <button class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] mr-2" @click="progressPopupMinimized = !progressPopupMinimized">
+                        <i :class="progressPopupMinimized ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas fa-fw"></i>
+                    </button>
+                    <button class="text-[var(--text-muted)] hover:text-[var(--text-danger)]" @click="progressPopupClosed = true" title="Close">
+                        <i class="fas fa-times fa-fw"></i>
+                    </button>
+                </div>
             </div>
 
              <div class="p-3 max-h-60 overflow-y-auto custom-scrollbar" v-show="!progressPopupMinimized">
@@ -3857,8 +4110,6 @@ markdown==3.5.1
                     globalError.value = null;
                     isLoadingRecordings.value = true;
                     try {
-                        // Since this code is inside the "if current_user.is_authenticated" block,
-                        // we can assume the user is authenticated and directly fetch recordings
                         const response = await fetch('/recordings');
                         const data = await response.json();
                         if (!response.ok) throw new Error(data.error || 'Failed to load recordings');

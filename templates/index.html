@@ -889,18 +889,23 @@
             </div>
         </div>
 
-        <div v-if="uploadQueue.length > 0 || currentlyProcessingFile"
+        <div v-if="(uploadQueue.length > 0 || currentlyProcessingFile) && !progressPopupClosed"
              class="progress-popup bg-[var(--bg-secondary)] rounded-lg shadow-xl border border-[var(--border-primary)] overflow-hidden"
              :class="{ 'minimized': progressPopupMinimized }">
 
-            <div class="flex justify-between items-center p-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)] cursor-pointer" @click="progressPopupMinimized = !progressPopupMinimized">
-                <h4 class="text-sm font-semibold text-[var(--text-secondary)]">
+            <div class="flex justify-between items-center p-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+                <h4 class="text-sm font-semibold text-[var(--text-secondary)] cursor-pointer" @click="progressPopupMinimized = !progressPopupMinimized">
                     <i class="fas fa-upload mr-2 text-[var(--text-accent)]"></i>
                     Upload & Process Progress (${ completedInQueue }/${ totalInQueue } completed)
                 </h4>
-                <button class="text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
-                    <i :class="progressPopupMinimized ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas fa-fw"></i>
-                </button>
+                <div class="flex items-center">
+                    <button class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] mr-2" @click="progressPopupMinimized = !progressPopupMinimized">
+                        <i :class="progressPopupMinimized ? 'fa-chevron-up' : 'fa-chevron-down'" class="fas fa-fw"></i>
+                    </button>
+                    <button class="text-[var(--text-muted)] hover:text-[var(--text-danger)]" @click="progressPopupClosed = true" title="Close">
+                        <i class="fas fa-times fa-fw"></i>
+                    </button>
+                </div>
             </div>
 
              <div class="p-3 max-h-60 overflow-y-auto custom-scrollbar" v-show="!progressPopupMinimized">
@@ -974,6 +979,7 @@
                 const isProcessingActive = ref(false);
                 const pollInterval = ref(null);
                 const progressPopupMinimized = ref(false);
+                const progressPopupClosed = ref(false);
 
                 const showEditModal = ref(false);
                 const showDeleteModal = ref(false);
@@ -1668,8 +1674,14 @@
                  watch(uploadQueue, (newQueue, oldQueue) => {
                     if (newQueue.length === 0 && oldQueue.length > 0 && !isProcessingActive.value) {
                         console.log("Upload queue processing finished.");
-                        // Optional: Auto-minimize after delay
-                         // setTimeout(() => progressPopupMinimized.value = true, 3000);
+                        // Auto-minimize after delay
+                        setTimeout(() => progressPopupMinimized.value = true, 1000);
+                        // Auto-hide popup after all uploads are complete
+                        setTimeout(() => {
+                            if (completedInQueue.value === totalInQueue.value && !isProcessingActive.value) {
+                                progressPopupClosed.value = true;
+                            }
+                        }, 5000);
                      }
                  }, { deep: true });
 
@@ -1887,7 +1899,7 @@
                     isLoadingRecordings, globalError, maxFileSizeMB, isDarkMode, // <-- Added isDarkMode
                     // Multi-upload State
                     uploadQueue, currentlyProcessingFile, processingProgress, processingMessage,
-                    isProcessingActive, progressPopupMinimized,
+                    isProcessingActive, progressPopupMinimized, progressPopupClosed,
                     // Chat State
                     showChat, chatMessages, chatInput, isChatLoading, chatMessagesRef, // <-- Added chatMessagesRef
                     // Computed
