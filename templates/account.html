@@ -101,13 +101,33 @@
             <h1 class="text-3xl font-bold text-[var(--text-primary)]">
                 <a href="{{ url_for('index') }}">Speakr</a>
             </h1>
-            <div class="flex items-center space-x-4">
-                <a href="{{ url_for('index') }}" class="text-[var(--text-secondary)] hover:text-[var(--text-accent)]">
-                    <i class="fas fa-home mr-1"></i> Home
-                </a>
-                <a href="{{ url_for('logout') }}" class="text-[var(--text-secondary)] hover:text-[var(--text-danger)]">
-                    <i class="fas fa-sign-out-alt mr-1"></i> Logout
-                </a>
+            <div class="flex items-center space-x-2">
+                <button id="darkModeToggle" class="p-2 rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] dark:text-gray-400 dark:hover:bg-gray-700 transition-colors duration-200">
+                    <i id="darkModeIcon" class="fas fa-moon"></i>
+                </button>
+                <div class="relative" id="userDropdown">
+                    <button id="userDropdownButton" class="flex items-center px-3 py-2 border border-[var(--border-secondary)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-accent)] focus:outline-none">
+                        <i class="fas fa-user mr-2"></i>
+                        <span>{{ current_user.username }}</span>
+                        <i class="fas fa-chevron-down ml-2"></i>
+                    </button>
+                    <div id="userDropdownMenu" class="hidden absolute right-0 mt-2 w-48 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg z-10">
+                        <a href="{{ url_for('index') }}" class="block px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-accent)]">
+                            <i class="fas fa-home mr-2"></i> Home
+                        </a>
+                        <a href="{{ url_for('account') }}" class="block px-4 py-2 text-[var(--text-accent)] bg-[var(--bg-accent)]">
+                            <i class="fas fa-user-circle mr-2"></i> Account
+                        </a>
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin') }}" class="block px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-accent)]">
+                            <i class="fas fa-user-shield mr-2"></i> Admin
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-danger)]">
+                            <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                        </a>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -194,5 +214,59 @@
             Speakr &copy; {{ now.year }}
         </footer>
     </div>
+
+    <script>
+        // Dark mode toggle functionality
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const darkModeIcon = document.getElementById('darkModeIcon');
+        
+        // Initialize dark mode based on localStorage or system preference
+        function initializeDarkMode() {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const savedMode = localStorage.getItem('darkMode');
+            
+            if (savedMode === 'true' || (savedMode === null && prefersDark)) {
+                document.documentElement.classList.add('dark');
+                darkModeIcon.classList.remove('fa-moon');
+                darkModeIcon.classList.add('fa-sun');
+            } else {
+                document.documentElement.classList.remove('dark');
+                darkModeIcon.classList.remove('fa-sun');
+                darkModeIcon.classList.add('fa-moon');
+            }
+        }
+        
+        // Toggle dark mode
+        darkModeToggle.addEventListener('click', () => {
+            const isDarkMode = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', isDarkMode);
+            
+            if (isDarkMode) {
+                darkModeIcon.classList.remove('fa-moon');
+                darkModeIcon.classList.add('fa-sun');
+            } else {
+                darkModeIcon.classList.remove('fa-sun');
+                darkModeIcon.classList.add('fa-moon');
+            }
+        });
+        
+        // User dropdown functionality
+        const userDropdownButton = document.getElementById('userDropdownButton');
+        const userDropdownMenu = document.getElementById('userDropdownMenu');
+        
+        userDropdownButton.addEventListener('click', () => {
+            userDropdownMenu.classList.toggle('hidden');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!userDropdownButton.contains(event.target) && !userDropdownMenu.contains(event.target)) {
+                userDropdownMenu.classList.add('hidden');
+            }
+        });
+        
+        // Initialize dark mode on page load
+        initializeDarkMode();
+    </script>
 </body>
 </html>
