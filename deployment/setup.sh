@@ -9,7 +9,15 @@ cp app.py /opt/transcription-app/
 cp -r templates /opt/transcription-app/
 cp requirements.txt /opt/transcription-app/
 cp reset_db.py /opt/transcription-app/
+cp migrate_db.py /opt/transcription-app/
+cp create_admin.py /opt/transcription-app/
 cp .env /opt/transcription-app/  # Copy the .env file with API keys
+
+# Add SECRET_KEY to .env file if it doesn't exist
+if ! grep -q "SECRET_KEY" /opt/transcription-app/.env; then
+    echo "SECRET_KEY=$(openssl rand -hex 32)" >> /opt/transcription-app/.env
+    echo "Added SECRET_KEY to .env file"
+fi
 
 # Create and activate virtual environment
 python3 -m venv /opt/transcription-app/venv
@@ -25,8 +33,16 @@ mkdir -p /opt/transcription-app/instance
 chmod 755 /opt/transcription-app/uploads
 chmod 755 /opt/transcription-app/instance
 
-# Initialize the database
-python reset_db.py
+# Initialize or migrate the database
+if [ ! -f /opt/transcription-app/instance/transcriptions.db ]; then
+    # If database doesn't exist, create it from scratch
+    echo "Database doesn't exist. Creating new database..."
+    python reset_db.py
+else
+    # If database exists, migrate it to preserve data
+    echo "Database exists. Migrating schema to preserve data..."
+    python migrate_db.py
+fi
 
 # Set proper ownership for all files
 sudo chown -R $USER:$USER /opt/transcription-app
@@ -62,3 +78,12 @@ sleep 3
 sudo systemctl status transcription
 
 echo "Installation complete! The application should be running on port 8899."
+
+# Ask if user wants to create an admin user
+read -p "Do you want to create an admin user now? (y/n): " create_admin
+if [[ $create_admin == "y" || $create_admin == "Y" ]]; then
+    echo "Creating admin user..."
+    python create_admin.py
+else
+    echo "You can create an admin user later by running: python create_admin.py"
+fi

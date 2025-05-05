@@ -1,7 +1,7 @@
 # Speakr - Audio Transcription and Summarization App
 import os
 import sys
-from flask import Flask, render_template, request, jsonify, send_file, Markup, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, send_file, Markup
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from openai import OpenAI # Keep using the OpenAI library
@@ -14,17 +14,9 @@ from dotenv import load_dotenv # Import load_dotenv
 import httpx 
 import re
 import markdown
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_bcrypt import Bcrypt
-from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, BooleanField
-from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Initialize Flask-Bcrypt
-bcrypt = Bcrypt()
 
 # Helper function to convert markdown to HTML
 def md_to_html(text):
@@ -46,22 +38,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////opt/transcription-app/instance/transcriptions.db'
 app.config['UPLOAD_FOLDER'] = '/opt/transcription-app/uploads' # Use absolute path based on setup
 app.config['MAX_CONTENT_LENGTH'] = 250 * 1024 * 1024  # 250MB max file size
-# Set a secret key for session management and CSRF protection
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key-change-in-production')
 db = SQLAlchemy()
 db.init_app(app)
-
-# Initialize Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-login_manager.login_message_category = 'info'
-bcrypt.init_app(app)
-
-# Add context processor to make 'now' available to all templates
-@app.context_processor
-def inject_now():
-    return {'now': datetime.now()}
 
 # Ensure upload and instance directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -69,25 +47,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '/')), exist_ok=True)
 
 
-# --- User loader for Flask-Login ---
-@login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(User, int(user_id))
-
 # --- Database Models ---
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(60), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
-    recordings = db.relationship('Recording', backref='owner', lazy=True)
-    
-    def __repr__(self):
-        return f"User('{self.username}', '{self.email}')"
 class Recording(db.Model):
-    # Add user_id foreign key to associate recordings with users
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     id = db.Column(db.Integer, primary_key=True)
     # Title will now often be AI-generated, maybe start with filename?
     title = db.Column(db.String(200), nullable=True) # Allow Null initially
@@ -114,33 +75,8 @@ class Recording(db.Model):
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'meeting_date': self.meeting_date.isoformat() if self.meeting_date else None, # <-- ADDED: Include meeting_date
-            'file_size': self.file_size,
-            'user_id': self.user_id
+            'file_size': self.file_size
         }
-
-# --- Forms for Authentication ---
-class RegistrationForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=2, max=20)])
-    email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
-    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
-    submit = SubmitField('Sign Up')
-    
-    def validate_username(self, username):
-        user = User.query.filter_by(username=username.data).first()
-        if user:
-            raise ValidationError('That username is already taken. Please choose a different one.')
-    
-    def validate_email(self, email):
-        user = User.query.filter_by(email=email.data).first()
-        if user:
-            raise ValidationError('That email is already registered. Please use a different one.')
-
-class LoginForm(FlaskForm):
-    email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    remember = BooleanField('Remember Me')
-    submit = SubmitField('Login')
 
 with app.app_context():
     db.create_all()
@@ -324,7 +260,6 @@ JSON Response:""" # The prompt guides the model towards the desired output
 
 # --- Chat with Transcription ---
 @app.route('/chat', methods=['POST'])
-@login_required
 def chat_with_transcription():
     try:
         data = request.json
@@ -344,10 +279,6 @@ def chat_with_transcription():
         recording = db.session.get(Recording, recording_id)
         if not recording:
             return jsonify({'error': 'Recording not found'}), 404
-            
-        # Check if the recording belongs to the current user
-        if recording.user_id and recording.user_id != current_user.id:
-            return jsonify({'error': 'You do not have permission to chat with this recording'}), 403
             
         # Check if OpenRouter client is available
         if client is None:
@@ -407,299 +338,15 @@ Additional context and notes about the meeting:
         return jsonify({'error': str(e)}), 500
 
 
-# --- Authentication Routes ---
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-    
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username=form.username.data, email=form.email.data, password=hashed_password)
-        db.session.add(user)
-        db.session.commit()
-        flash('Your account has been created! You can now log in.', 'success')
-        return redirect(url_for('login'))
-    
-    return render_template('register.html', title='Register', form=form)
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-    
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
-        if user and bcrypt.check_password_hash(user.password, form.password.data):
-            login_user(user, remember=form.remember.data)
-            next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('index'))
-        else:
-            flash('Login unsuccessful. Please check email and password.', 'danger')
-    
-    return render_template('login.html', title='Login', form=form)
-
-@app.route('/logout')
-def logout():
-    logout_user()
-    return redirect(url_for('index'))
-
-@app.route('/account', methods=['GET'])
-@login_required
-def account():
-    return render_template('account.html', title='Account')
-
-# --- Admin Routes ---
-@app.route('/admin', methods=['GET'])
-@login_required
-def admin():
-    # Check if user is admin
-    if not current_user.is_admin:
-        flash('You do not have permission to access the admin page.', 'danger')
-        return redirect(url_for('index'))
-    return render_template('admin.html', title='Admin Dashboard')
-
-@app.route('/admin/users', methods=['GET'])
-@login_required
-def admin_get_users():
-    # Check if user is admin
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    users = User.query.all()
-    user_data = []
-    
-    for user in users:
-        # Get recordings count and storage used
-        recordings_count = len(user.recordings)
-        storage_used = sum(r.file_size for r in user.recordings if r.file_size) or 0
-        
-        user_data.append({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'is_admin': user.is_admin,
-            'recordings_count': recordings_count,
-            'storage_used': storage_used
-        })
-    
-    return jsonify(user_data)
-
-@app.route('/admin/users', methods=['POST'])
-@login_required
-def admin_add_user():
-    # Check if user is admin
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    data = request.json
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    # Validate required fields
-    required_fields = ['username', 'email', 'password']
-    for field in required_fields:
-        if field not in data:
-            return jsonify({'error': f'Missing required field: {field}'}), 400
-    
-    # Check if username or email already exists
-    if User.query.filter_by(username=data['username']).first():
-        return jsonify({'error': 'Username already exists'}), 400
-    
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': 'Email already exists'}), 400
-    
-    # Create new user
-    hashed_password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-    new_user = User(
-        username=data['username'],
-        email=data['email'],
-        password=hashed_password,
-        is_admin=data.get('is_admin', False)
-    )
-    
-    db.session.add(new_user)
-    db.session.commit()
-    
-    return jsonify({
-        'id': new_user.id,
-        'username': new_user.username,
-        'email': new_user.email,
-        'is_admin': new_user.is_admin,
-        'recordings_count': 0,
-        'storage_used': 0
-    }), 201
-
-@app.route('/admin/users/<int:user_id>', methods=['PUT'])
-@login_required
-def admin_update_user(user_id):
-    # Check if user is admin
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    data = request.json
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
-    
-    # Update user fields
-    if 'username' in data and data['username'] != user.username:
-        # Check if username already exists
-        if User.query.filter_by(username=data['username']).first():
-            return jsonify({'error': 'Username already exists'}), 400
-        user.username = data['username']
-    
-    if 'email' in data and data['email'] != user.email:
-        # Check if email already exists
-        if User.query.filter_by(email=data['email']).first():
-            return jsonify({'error': 'Email already exists'}), 400
-        user.email = data['email']
-    
-    if 'password' in data and data['password']:
-        user.password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-    
-    if 'is_admin' in data:
-        user.is_admin = data['is_admin']
-    
-    db.session.commit()
-    
-    # Get recordings count and storage used
-    recordings_count = len(user.recordings)
-    storage_used = sum(r.file_size for r in user.recordings if r.file_size) or 0
-    
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'is_admin': user.is_admin,
-        'recordings_count': recordings_count,
-        'storage_used': storage_used
-    })
-
-@app.route('/admin/users/<int:user_id>', methods=['DELETE'])
-@login_required
-def admin_delete_user(user_id):
-    # Check if user is admin
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    # Prevent deleting self
-    if user_id == current_user.id:
-        return jsonify({'error': 'Cannot delete your own account'}), 400
-    
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    # Delete user's recordings and audio files
-    for recording in user.recordings:
-        try:
-            if recording.audio_path and os.path.exists(recording.audio_path):
-                os.remove(recording.audio_path)
-        except Exception as e:
-            app.logger.error(f"Error deleting audio file {recording.audio_path}: {e}")
-    
-    # Delete user
-    db.session.delete(user)
-    db.session.commit()
-    
-    return jsonify({'success': True})
-
-@app.route('/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
-@login_required
-def admin_toggle_admin(user_id):
-    # Check if user is admin
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    # Prevent changing own admin status
-    if user_id == current_user.id:
-        return jsonify({'error': 'Cannot change your own admin status'}), 400
-    
-    user = db.session.get(User, user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    # Toggle admin status
-    user.is_admin = not user.is_admin
-    db.session.commit()
-    
-    return jsonify({'success': True, 'is_admin': user.is_admin})
-
-@app.route('/admin/stats', methods=['GET'])
-@login_required
-def admin_get_stats():
-    # Check if user is admin
-    if not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    # Get total users
-    total_users = User.query.count()
-    
-    # Get total recordings
-    total_recordings = Recording.query.count()
-    
-    # Get recordings by status
-    completed_recordings = Recording.query.filter_by(status='COMPLETED').count()
-    processing_recordings = Recording.query.filter(Recording.status.in_(['PROCESSING', 'SUMMARIZING'])).count()
-    pending_recordings = Recording.query.filter_by(status='PENDING').count()
-    failed_recordings = Recording.query.filter_by(status='FAILED').count()
-    
-    # Get total storage used
-    total_storage = db.session.query(db.func.sum(Recording.file_size)).scalar() or 0
-    
-    # Get top users by storage
-    top_users_query = db.session.query(
-        User.id,
-        User.username,
-        db.func.count(Recording.id).label('recordings_count'),
-        db.func.sum(Recording.file_size).label('storage_used')
-    ).join(Recording, User.id == Recording.user_id, isouter=True) \
-     .group_by(User.id) \
-     .order_by(db.func.sum(Recording.file_size).desc()) \
-     .limit(5)
-    
-    top_users = []
-    for user_id, username, recordings_count, storage_used in top_users_query:
-        top_users.append({
-            'id': user_id,
-            'username': username,
-            'recordings_count': recordings_count or 0,
-            'storage_used': storage_used or 0
-        })
-    
-    # Get total queries (chat requests)
-    # This is a placeholder - you would need to track this in your database
-    total_queries = 0
-    
-    return jsonify({
-        'total_users': total_users,
-        'total_recordings': total_recordings,
-        'completed_recordings': completed_recordings,
-        'processing_recordings': processing_recordings,
-        'pending_recordings': pending_recordings,
-        'failed_recordings': failed_recordings,
-        'total_storage': total_storage,
-        'top_users': top_users,
-        'total_queries': total_queries
-    })
-
 # --- Flask Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/recordings', methods=['GET'])
-@login_required
 def get_recordings():
     try:
-        # Filter recordings by the current user
-        stmt = select(Recording).where(Recording.user_id == current_user.id).order_by(Recording.created_at.desc())
+        stmt = select(Recording).order_by(Recording.created_at.desc())
         recordings = db.session.execute(stmt).scalars().all()
         return jsonify([recording.to_dict() for recording in recordings])
     except Exception as e:
@@ -707,7 +354,6 @@ def get_recordings():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/save', methods=['POST'])
-@login_required
 def save_metadata():
     try:
         data = request.json
@@ -717,10 +363,6 @@ def save_metadata():
 
         recording = db.session.get(Recording, recording_id)
         if not recording: return jsonify({'error': 'Recording not found'}), 404
-        
-        # Check if the recording belongs to the current user
-        if recording.user_id and recording.user_id != current_user.id:
-            return jsonify({'error': 'You do not have permission to edit this recording'}), 403
 
         # Update fields if provided
         if 'title' in data: recording.title = data['title']
@@ -751,7 +393,6 @@ def save_metadata():
 
 
 @app.route('/upload', methods=['POST'])
-@login_required
 def upload_file():
     try:
         if 'file' not in request.files:
@@ -784,8 +425,7 @@ def upload_file():
             title=f"Recording - {filename}",
             file_size=file_size,
             status='PENDING', # Explicitly set status
-            meeting_date=datetime.utcnow().date(), # <-- ADDED: Default meeting_date to today
-            user_id=current_user.id # Associate with the current user
+            meeting_date=datetime.utcnow().date() # <-- ADDED: Default meeting_date to today
         )
         db.session.add(recording)
         db.session.commit()
@@ -816,37 +456,26 @@ def upload_file():
         return jsonify({'error': str(e)}), 500
 
 
-# Status Endpoint
+# Status Endpoint (no changes needed, it returns the full recording dict)
 @app.route('/status/<int:recording_id>', methods=['GET'])
-@login_required
 def get_status(recording_id):
     """Endpoint to check the transcription/summarization status."""
     try:
         recording = db.session.get(Recording, recording_id)
         if not recording:
             return jsonify({'error': 'Recording not found'}), 404
-        
-        # Check if the recording belongs to the current user
-        if recording.user_id and recording.user_id != current_user.id:
-            return jsonify({'error': 'You do not have permission to view this recording'}), 403
-            
         return jsonify(recording.to_dict())
     except Exception as e:
         app.logger.error(f"Error fetching status for recording {recording_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
-# Get Audio Endpoint
+# Get Audio Endpoint (no changes needed)
 @app.route('/audio/<int:recording_id>')
-@login_required
 def get_audio(recording_id):
     try:
         recording = db.session.get(Recording, recording_id)
         if not recording or not recording.audio_path:
             return jsonify({'error': 'Recording or audio file not found'}), 404
-            
-        # Check if the recording belongs to the current user
-        if recording.user_id and recording.user_id != current_user.id:
-            return jsonify({'error': 'You do not have permission to access this audio file'}), 403
         if not os.path.exists(recording.audio_path):
             app.logger.error(f"Audio file missing from server: {recording.audio_path}")
             return jsonify({'error': 'Audio file missing from server'}), 404
@@ -855,18 +484,13 @@ def get_audio(recording_id):
         app.logger.error(f"Error serving audio for recording {recording_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
-# Delete Recording Endpoint
+# Delete Recording Endpoint (no changes needed functionally)
 @app.route('/recording/<int:recording_id>', methods=['DELETE'])
-@login_required
 def delete_recording(recording_id):
     try:
         recording = db.session.get(Recording, recording_id)
         if not recording:
             return jsonify({'error': 'Recording not found'}), 404
-            
-        # Check if the recording belongs to the current user
-        if recording.user_id and recording.user_id != current_user.id:
-            return jsonify({'error': 'You do not have permission to delete this recording'}), 403
 
         # Delete the audio file first
         try:
