@@ -365,9 +365,6 @@
                 Speakr
             </h1>
             <div class="flex items-center space-x-2">
-                 <button @click="toggleSidebar" class="p-2 rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] dark:text-gray-400 dark:hover:bg-gray-700 transition-colors duration-200" :title="isSidebarCollapsed ? 'Show Sidebar' : 'Hide Sidebar'">
-                    <i :class="isSidebarCollapsed ? 'fas fa-bars' : 'fas fa-chevron-left'"></i>
-                 </button>
                  <button @click="toggleDarkMode" class="p-2 rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] dark:text-gray-400 dark:hover:bg-gray-700 transition-colors duration-200" :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
                     <i :class="isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
                 </button>
@@ -396,6 +393,8 @@
             </div>
         </div>
 
+        <!-- Sidebar toggle button will be positioned relative to the main container -->
+
         <main class="flex-grow"
              @dragover.prevent="dragover = true"
              @dragleave.prevent="handleDragLeave"
@@ -408,10 +407,23 @@
                 </div>
             </div>
 
-            <div v-if="currentView === 'gallery'" class="flex-grow flex flex-col rounded-lg">
-                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-grow">
-                    <div v-show="!isSidebarCollapsed" class="lg:col-span-1 bg-[var(--bg-secondary)] p-4 rounded-lg shadow-md flex flex-col">
-                        <h3 class="text-lg font-semibold mb-4 sticky top-0 bg-[var(--bg-secondary)] pb-3 border-b border-[var(--border-primary)] text-[var(--text-primary)]">Recordings</h3>
+            <div v-if="currentView === 'gallery'" class="flex-grow flex flex-col rounded-lg relative">
+                <!-- Sidebar toggle button that appears when sidebar is collapsed - positioned at the left edge of main content -->
+                <button v-if="isSidebarCollapsed" 
+                        @click="toggleSidebar" 
+                        class="absolute -left-3 top-1/4 z-20 bg-gradient-to-r from-[var(--bg-accent)] to-[var(--bg-secondary)] p-2 pl-1 pr-3 rounded-r-lg shadow-lg text-[var(--text-accent)] hover:text-[var(--text-primary)] hover:shadow-xl transition-all duration-300 transform hover:translate-x-1 border-r border-t border-b border-[var(--border-accent)]"
+                        title="Show Sidebar">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-grow">
+                    <div v-show="!isSidebarCollapsed" class="lg:col-span-1 bg-[var(--bg-secondary)] p-4 rounded-lg shadow-md flex flex-col relative">
+                         <div class="flex justify-between items-center mb-4 sticky top-0 bg-[var(--bg-secondary)] pb-3 border-b border-[var(--border-primary)]">
+                            <h3 class="text-lg font-semibold text-[var(--text-primary)]">Recordings</h3>
+                            <button @click="toggleSidebar" class="p-1 rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] dark:text-gray-400 dark:hover:bg-gray-700 transition-colors duration-200" :title="isSidebarCollapsed ? 'Show Sidebar' : 'Hide Sidebar'">
+                                <i class="fas fa-chevron-left"></i>
+                             </button>
+                        </div>
                          <div v-if="isLoadingRecordings" class="text-center text-[var(--text-muted)] py-4">
                             <i class="fas fa-spinner fa-spin mr-2"></i> Loading recordings...
                         </div>
