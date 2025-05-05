@@ -122,7 +122,7 @@
             border-radius: 0.75rem; /* rounded-xl */
             border: 1px solid #e5e7eb; /* border-gray-200 */
             min-height: 60px; /* min-h-[60px] or adjust as needed */
-            max-height: 20rem; /* Limit height */
+            /* max-height removed to allow full height */
             overflow-y: auto;
             white-space: pre-wrap;
             font-family: inherit; /* Use body font */
@@ -140,12 +140,22 @@
         div[v-if="!editingNotes"] {
             border-radius: 0.75rem !important; /* rounded-xl */
         }
+        
+        /* Ensure consistent height for tab content boxes */
+        .tab-content-box {
+            height: 200px !important;
+            overflow-y: auto;
+        }
+        .chat-content-box {
+            height: 650px !important;
+            overflow-y: auto;
+        }
         .metadata-panel {
             background-color: var(--bg-tertiary);
             border: 1px solid var(--border-primary);
-            border-radius: 0.5rem; /* rounded-lg */
-            padding: 0.75rem 1rem; /* p-3 px-4 */
-            margin-top: 0.75rem; /* mt-3 */
+            border-radius: 0.75rem; /* rounded-xl to match others */
+            padding: 1rem; /* p-4 to be consistent */
+            /* margin-top removed to align with other boxes */
             font-size: 0.875rem; /* text-sm */
             color: var(--text-secondary);
         }
@@ -206,6 +216,46 @@
              background-color: #f3f4f6;
              transform: translateY(-1px);
              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+         }
+         
+         /* Hover edit button styles */
+         .content-box {
+             position: relative;
+         }
+         
+         .hover-edit-btn {
+             position: absolute;
+             top: 10px;
+             right: 10px;
+             background-color: rgba(255, 255, 255, 0.9);
+             border: 1px solid #e5e7eb;
+             border-radius: 0.5rem;
+             padding: 0.35rem 0.75rem;
+             font-size: 0.75rem;
+             cursor: pointer;
+             z-index: 10;
+             transition: all 0.2s ease;
+             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+             opacity: 0;
+         }
+         
+         .content-box:hover .hover-edit-btn {
+             opacity: 1;
+         }
+         
+         .hover-edit-btn:hover {
+             background-color: #f3f4f6;
+             transform: translateY(-1px);
+             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+         }
+         
+         .dark .hover-edit-btn {
+             background-color: rgba(55, 65, 81, 0.9);
+             border-color: #4b5563;
+         }
+         
+         .dark .hover-edit-btn:hover {
+             background-color: #4b5563;
          }
          
          /* Modern chat section styles */
@@ -621,50 +671,59 @@
                                                         class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
                                                     Notes
                                                 </button>
+                                                <button @click="selectedTab = 'metadata'" 
+                                                        :class="selectedTab === 'metadata' ? 'border-[var(--border-focus)] text-[var(--text-accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-secondary)]'"
+                                                        class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm">
+                                                    Metadata
+                                                </button>
                                             </nav>
                                         </div>
                                         <div class="pt-4">
                                             <!-- Summary Panel -->
                                             <div v-show="selectedTab === 'summary'" class="overflow-hidden">
-                                                <div class="flex justify-between items-center mb-1">
-                                                    <button @click="toggleEditSummary" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded ml-auto">
-                                                        <i class="fas" :class="editingSummary ? 'fa-check' : 'fa-edit'"></i>
-                                                    </button>
-                                                </div>
                                                 <div v-if="selectedRecording.status === 'COMPLETED'">
-                                                    <div v-if="!editingSummary" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                    <div v-if="!editingSummary" class="content-box">
+                                                        <div class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] tab-content-box" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                        </div>
+                                                        <button @click="toggleEditSummary" class="hover-edit-btn text-[var(--text-muted)] hover:text-[var(--text-accent)]" title="Edit Summary">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
                                                     </div>
-                                                    <textarea v-else v-model="selectedRecording.summary" @blur="saveInlineEdit('summary')" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter summary"></textarea>
+                                                    <textarea v-else v-model="selectedRecording.summary" @blur="saveInlineEdit('summary')" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)] tab-content-box" placeholder="Enter summary"></textarea>
                                                 </div>
-                                                <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
+                                                <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] tab-content-box" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
                                                 </div>
                                                 <div v-else class="h-24 flex items-center justify-center p-4 bg-[var(--bg-tertiary)] rounded border border-[var(--border-primary)] text-[var(--text-muted)]">
                                                     <i class="fas fa-spinner fa-spin mr-2"></i> Summary pending...
                                                 </div>
-                                            </div>
-                                            <!-- Notes Panel -->
-                                            <div v-show="selectedTab === 'notes'" class="overflow-hidden">
-                                                <div class="flex justify-between items-center mb-1">
-                                                    <button @click="toggleEditNotes" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded ml-auto">
-                                                        <i class="fas" :class="editingNotes ? 'fa-check' : 'fa-edit'"></i>
-                                                    </button>
-                                                </div>
-                                                <div v-if="!editingNotes" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded-xl border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
-                                                <textarea v-else v-model="selectedRecording.notes" @blur="saveInlineEdit('notes')" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter notes"></textarea>
+                                                
                                             </div>
                                             
-                                            <!-- Metadata Panel -->
-                                            <div class="metadata-panel">
-                                                <dl>
-                                                    <div v-if="selectedRecording.original_filename">
-                                                        <dt>Original Filename</dt>
-                                                        <dd>${ selectedRecording.original_filename }</dd>
-                                                    </div>
-                                                    <div>
-                                                        <dt>File Size</dt>
-                                                        <dd>${ formatFileSize(selectedRecording.file_size) }</dd>
-                                                    </div>
-                                                </dl>
+                                            <!-- Notes Panel -->
+                                            <div v-show="selectedTab === 'notes'" class="overflow-hidden">
+                                                <div v-if="!editingNotes" class="content-box">
+                                                    <div class="text-sm bg-[var(--bg-tertiary)] p-4 rounded-xl border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] tab-content-box" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
+                                                    <button @click="toggleEditNotes" class="hover-edit-btn text-[var(--text-muted)] hover:text-[var(--text-accent)]" title="Edit Notes">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                </div>
+                                                <textarea v-else v-model="selectedRecording.notes" @blur="saveInlineEdit('notes')" class="text-sm bg-[var(--bg-tertiary)] p-4 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)] tab-content-box" placeholder="Enter notes"></textarea>
+                                            </div>
+                                            
+                                            <!-- Metadata Panel (in separate tab) -->
+                                            <div v-show="selectedTab === 'metadata'" class="overflow-hidden">
+                                                <div class="metadata-panel custom-scrollbar tab-content-box">
+                                                    <dl>
+                                                        <div v-if="selectedRecording.original_filename">
+                                                            <dt>Original Filename</dt>
+                                                            <dd>${ selectedRecording.original_filename }</dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt>File Size</dt>
+                                                            <dd>${ formatFileSize(selectedRecording.file_size) }</dd>
+                                                        </div>
+                                                    </dl>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -686,7 +745,7 @@
                                     <div class="flex flex-col overflow-hidden">
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-2 flex-shrink-0">Chat with Transcript</h4>
                                         <!-- Chat container with fixed height matching left column -->
-                                        <div class="chat-container border-[var(--border-primary)] bg-[var(--bg-secondary)]" style="height: 684px;"> 
+                                        <div class="chat-container border-[var(--border-primary)] bg-[var(--bg-secondary)] chat-content-box"> 
                                             <div class="chat-messages custom-scrollbar" ref="chatMessagesRef">
                                                 <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full text-[var(--text-muted)]">
                                                     <div class="text-center">
