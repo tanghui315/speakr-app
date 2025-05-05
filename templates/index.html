@@ -445,9 +445,23 @@
                                 <div class="mb-3 sm:mb-0 max-w-lg">
                                      <h3 class="text-2xl font-semibold text-[var(--text-primary)]">${ selectedRecording.title || 'Loading...' }</h3>
                                     <p class="text-sm text-[var(--text-muted)] mt-1">
-                                        <!-- Display Meeting Date -->
-                                        <span v-if="selectedRecording.meeting_date">
-                                            <i class="fas fa-calendar-alt mr-1"></i> Meeting Date: ${ formatDisplayDate(selectedRecording.meeting_date) } | 
+                                        <!-- Display Meeting Date with edit functionality -->
+                                        <span>
+                                            <i class="fas fa-calendar-alt mr-1"></i> 
+                                            <span v-if="!editingMeetingDate">
+                                                Meeting Date: 
+                                                <span @click="toggleEditMeetingDate" class="cursor-pointer hover:text-[var(--text-accent)]">
+                                                    ${ selectedRecording.meeting_date ? formatDisplayDate(selectedRecording.meeting_date) : 'Click to add' }
+                                                </span> | 
+                                            </span>
+                                            <span v-else class="inline-flex items-center">
+                                                <input type="date" v-model="selectedRecording.meeting_date" 
+                                                    @blur="saveInlineEdit('meeting_date')" 
+                                                    class="p-0 w-40 bg-transparent border-b border-[var(--border-secondary)] focus:outline-none focus:border-[var(--border-focus)]" />
+                                                <button @click="saveInlineEdit('meeting_date')" class="ml-1 text-xs text-[var(--text-accent)]">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </span>
                                         </span>
                                         Created: ${ new Date(selectedRecording.created_at).toLocaleString() } | Size: ${ formatFileSize(selectedRecording.file_size) }
                                     </p>
@@ -470,8 +484,14 @@
                                 <!-- Left Column: Participants, Transcription, Summary & Notes -->
                                 <div class="md:col-span-2 flex flex-col overflow-hidden space-y-4">
                                     <div>
-                                        <h4 class="font-semibold text-[var(--text-secondary)] mb-1">Participants</h4>
-                                        <p class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] min-h-[40px] text-[var(--text-secondary)]">${ selectedRecording.participants || 'None specified' }</p>
+                                        <div class="flex justify-between items-center mb-1">
+                                            <h4 class="font-semibold text-[var(--text-secondary)]">Participants</h4>
+                                            <button @click="toggleEditParticipants" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded">
+                                                <i class="fas" :class="editingParticipants ? 'fa-check' : 'fa-edit'"></i>
+                                            </button>
+                                        </div>
+                                        <div v-if="!editingParticipants" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] min-h-[40px] text-[var(--text-secondary)]">${ selectedRecording.participants || 'None specified' }</div>
+                                        <textarea v-else v-model="selectedRecording.participants" @blur="saveInlineEdit('participants')" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] min-h-[40px] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)] text-[var(--text-secondary)]" placeholder="Enter participants"></textarea>
                                     </div>
                                     <div>
                                         <h4 class="font-semibold text-[var(--text-secondary)] mb-2 flex-shrink-0">Transcription</h4>
@@ -511,7 +531,15 @@
                                         <div class="pt-4">
                                             <!-- Summary Panel -->
                                             <div v-show="selectedTab === 'summary'" class="overflow-hidden">
-                                                <div v-if="selectedRecording.status === 'COMPLETED'" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                <div class="flex justify-between items-center mb-1">
+                                                    <button @click="toggleEditSummary" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded ml-auto">
+                                                        <i class="fas" :class="editingSummary ? 'fa-check' : 'fa-edit'"></i>
+                                                    </button>
+                                                </div>
+                                                <div v-if="selectedRecording.status === 'COMPLETED'">
+                                                    <div v-if="!editingSummary" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'No summary generated.'">
+                                                    </div>
+                                                    <textarea v-else v-model="selectedRecording.summary" @blur="saveInlineEdit('summary')" class="summary-box custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter summary"></textarea>
                                                 </div>
                                                 <div v-else-if="selectedRecording.status === 'FAILED'" class="summary-box text-[var(--text-danger)] custom-scrollbar bg-[var(--bg-tertiary)] border-[var(--border-primary)]" style="height: 200px;" v-html="selectedRecording.summary_html || selectedRecording.summary || 'Summary generation failed or was skipped.'">
                                                 </div>
@@ -521,7 +549,13 @@
                                             </div>
                                             <!-- Notes Panel -->
                                             <div v-show="selectedTab === 'notes'" class="overflow-hidden">
-                                                <div class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
+                                                <div class="flex justify-between items-center mb-1">
+                                                    <button @click="toggleEditNotes" class="text-xs text-[var(--text-muted)] hover:text-[var(--text-accent)] p-1 rounded ml-auto">
+                                                        <i class="fas" :class="editingNotes ? 'fa-check' : 'fa-edit'"></i>
+                                                    </button>
+                                                </div>
+                                                <div v-if="!editingNotes" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)]" style="height: 200px;" v-html="selectedRecording.notes_html || selectedRecording.notes || 'No notes'"></div>
+                                                <textarea v-else v-model="selectedRecording.notes" @blur="saveInlineEdit('notes')" class="text-sm bg-[var(--bg-tertiary)] p-3 rounded border border-[var(--border-primary)] custom-scrollbar text-[var(--text-secondary)] w-full focus:ring-[var(--ring-focus)] focus:border-[var(--border-focus)]" style="height: 200px;" placeholder="Enter notes"></textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -762,6 +796,12 @@
                 const globalError = ref(null);
                 const maxFileSizeMB = ref(250); // Default, could fetch from config if needed
                 const isDarkMode = ref(false); // Dark mode state
+                
+                // Inline editing state
+                const editingParticipants = ref(false);
+                const editingMeetingDate = ref(false);
+                const editingSummary = ref(false);
+                const editingNotes = ref(false);
 
                 // --- Computed Properties ---
                 const groupedRecordings = computed(() => {
@@ -1332,6 +1372,81 @@
                         cancelDelete(); // Still close modal on error
                     }
                 };
+                
+                // Inline editing methods
+                const toggleEditParticipants = () => {
+                    editingParticipants.value = !editingParticipants.value;
+                    if (!editingParticipants.value) {
+                        saveInlineEdit('participants');
+                    }
+                };
+                
+                const toggleEditMeetingDate = () => {
+                    editingMeetingDate.value = !editingMeetingDate.value;
+                    if (!editingMeetingDate.value) {
+                        saveInlineEdit('meeting_date');
+                    }
+                };
+                
+                const toggleEditSummary = () => {
+                    editingSummary.value = !editingSummary.value;
+                    if (!editingSummary.value) {
+                        saveInlineEdit('summary');
+                    }
+                };
+                
+                const toggleEditNotes = () => {
+                    editingNotes.value = !editingNotes.value;
+                    if (!editingNotes.value) {
+                        saveInlineEdit('notes');
+                    }
+                };
+                
+                const saveInlineEdit = async (field) => {
+                    if (!selectedRecording.value) return;
+                    
+                    // Create a payload with just the field being edited
+                    const payload = {
+                        id: selectedRecording.value.id,
+                        [field]: selectedRecording.value[field]
+                    };
+                    
+                    // For completeness, include all editable fields in the payload
+                    // This ensures the backend has all the data it needs
+                    const fullPayload = {
+                        id: selectedRecording.value.id,
+                        title: selectedRecording.value.title,
+                        participants: selectedRecording.value.participants,
+                        notes: selectedRecording.value.notes,
+                        summary: selectedRecording.value.summary,
+                        meeting_date: selectedRecording.value.meeting_date
+                    };
+                    
+                    try {
+                        const success = await saveMetadata(fullPayload);
+                        if (success) {
+                            // Reset the editing state for the field
+                            switch(field) {
+                                case 'participants':
+                                    editingParticipants.value = false;
+                                    break;
+                                case 'meeting_date':
+                                    editingMeetingDate.value = false;
+                                    break;
+                                case 'summary':
+                                    editingSummary.value = false;
+                                    break;
+                                case 'notes':
+                                    editingNotes.value = false;
+                                    break;
+                            }
+                            showToast(`${field.charAt(0).toUpperCase() + field.slice(1).replace('_', ' ')} updated successfully`);
+                        }
+                    } catch (error) {
+                        console.error(`Save ${field} Error:`, error);
+                        setGlobalError(`Failed to save ${field}: ${error.message}`);
+                    }
+                };
 
                 // --- Lifecycle Hooks ---
                 onMounted(() => {
@@ -1567,6 +1682,8 @@
                     showChat, chatMessages, chatInput, isChatLoading, chatMessagesRef, // <-- Added chatMessagesRef
                     // Computed
                     groupedRecordings, totalInQueue, completedInQueue, queuedFiles, finishedFilesInQueue,
+                    // Inline editing state
+                    editingParticipants, editingMeetingDate, editingSummary, editingNotes,
                     // Methods
                     handleDrop, handleFileSelect, /*autoSave removed*/ loadRecordings, selectedTab, // <-- Added selectedTab
                     selectRecording, editRecording, cancelEdit, saveEdit, confirmDelete,
@@ -1574,6 +1691,8 @@
                     formatFileSize, setGlobalError, handleDragLeave, formatStatus, getStatusClass,
                     formatDisplayDate, // <-- ADDED: Expose date formatting function
                     toggleDarkMode, // <-- Added toggleDarkMode
+                    // Inline editing methods
+                    toggleEditParticipants, toggleEditMeetingDate, toggleEditSummary, toggleEditNotes, saveInlineEdit,
                     // Chat Methods
                     sendChatMessage, copyMessage, copyTranscription,
                  }
