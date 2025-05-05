@@ -408,10 +408,10 @@
             </div>
 
             <div v-if="currentView === 'gallery'" class="flex-grow flex flex-col rounded-lg relative">
-                <!-- Sidebar toggle button that appears when sidebar is collapsed - positioned at the left edge of main content -->
+                <!-- Sidebar toggle button that appears when sidebar is collapsed - positioned at the left edge of main content, aligned with title -->
                 <button v-if="isSidebarCollapsed" 
                         @click="toggleSidebar" 
-                        class="absolute -left-3 top-1/4 z-20 bg-gradient-to-r from-[var(--bg-accent)] to-[var(--bg-secondary)] p-2 pl-1 pr-3 rounded-r-lg shadow-lg text-[var(--text-accent)] hover:text-[var(--text-primary)] hover:shadow-xl transition-all duration-300 transform hover:translate-x-1 border-r border-t border-b border-[var(--border-accent)]"
+                        class="absolute -left-3 top-6 z-20 bg-gradient-to-r from-[var(--bg-accent)] to-[var(--bg-secondary)] p-2 pl-1 pr-3 rounded-r-lg shadow-lg text-[var(--text-accent)] hover:text-[var(--text-primary)] hover:shadow-xl transition-all duration-300 transform hover:translate-x-1 border-r border-t border-b border-[var(--border-accent)]"
                         title="Show Sidebar">
                     <i class="fas fa-chevron-right"></i>
                 </button>
