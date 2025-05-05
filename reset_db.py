@@ -3,6 +3,7 @@
 # Add this near the top if you run this standalone often outside app context
 import os
 import sys
+import shutil
 # Add project root to path if necessary for 'app' import
 # sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -29,7 +30,7 @@ except (RuntimeError, AttributeError, KeyError):
         print("Make sure reset_db.py is runnable and PYTHONPATH is set.")
         sys.exit(1)
 
-def reset_database():
+def reset_database(delete_uploads=True):
     # Determine the database path relative to the instance folder
     # Use app config if available
     instance_path = app.instance_path if hasattr(app, 'instance_path') else os.path.join(os.getcwd(), 'instance')
@@ -96,8 +97,34 @@ def reset_database():
         except Exception as rb_e:
              print(f"Rollback attempt failed: {rb_e}")
         sys.exit(1)
+        
+    # Delete all files in the uploads directory if requested
+    if delete_uploads:
+        try:
+            uploads_dir = os.path.join(os.getcwd(), 'uploads')
+            if os.path.exists(uploads_dir):
+                print(f"Deleting all files in uploads directory: {uploads_dir}")
+                for filename in os.listdir(uploads_dir):
+                    file_path = os.path.join(uploads_dir, filename)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            print(f"Deleted file: {file_path}")
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                            print(f"Deleted directory: {file_path}")
+                    except Exception as e:
+                        print(f"Error deleting {file_path}: {e}")
+                print("All files in uploads directory have been deleted.")
+            else:
+                print(f"Uploads directory not found: {uploads_dir}")
+                # Create the directory if it doesn't exist
+                os.makedirs(uploads_dir, exist_ok=True)
+                print(f"Created uploads directory: {uploads_dir}")
+        except Exception as e:
+            print(f"Error cleaning uploads directory: {e}")
 
 if __name__ == "__main__":
-    print("Attempting to reset the database...")
-    reset_database()
+    print("Attempting to reset the database and clean up all data...")
+    reset_database(delete_uploads=True)
     print("Database reset process finished.")
