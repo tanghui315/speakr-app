@@ -138,6 +138,7 @@ Section List：
 - **AI 对话界面效果图**：左右分隔的对话气泡、引用链接、推荐问题 Chip。
 - **订阅与额度效果图**：渐变额度卡 + 订阅方案，强调黄色提示与 CTA。
 - **宣传海报/横幅**：用于官方渠道的亮色渐变宣传图，包含“回声智心”与 EchoMind 品牌。
+- **品牌 Logo 元素**：包含 EchoMind 字母组合与声波/脑波符号，用于应用图标与宣传物料。
 
 AI 生成提示词示例：
 - `Generate a high-fidelity mobile app splash screen for an AI voice assistant named EchoMind, featuring a diagonal gradient from #5840FF to #21C5E5, minimalist logo in the center, bilingual tagline “回声智心 | EchoMind”, dark textured background, sleek futuristic style.`
@@ -147,3 +148,4 @@ AI 生成提示词示例：
 - `Illustrate an AI chat interface in a voice insights app, user messages right-aligned with purple gradient bubbles, AI replies left-aligned on light cards with citation chips, include quick question chips, overall palette violet and cyan accents.`
 - `Design a subscription management screen for a mobile AI transcription app featuring a gradient quota card with circular progress, pricing cards with yellow highlight labels, white background, rounded corners, soft shadows.`
 - `Create a marketing banner for “EchoMind 回声智心” showcasing a smartphone mockup with live captions, gradient background in purple-cyan, tagline “AI 语音洞察助手”, contemporary tech aesthetic.`
+- `Design a minimalistic logo for EchoMind, combining the letter E with a stylized soundwave or neural pulse motif, color palette #5840FF and #21C5E5, suitable for app icon and brand mark.`
