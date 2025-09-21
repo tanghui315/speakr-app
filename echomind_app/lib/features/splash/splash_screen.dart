@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_selection_screen.dart';
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -52,20 +53,20 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
+                children: [
                   Text(
-                    'EchoMind',
-                    style: TextStyle(
+                    context.l10n.splashTitle,
+                    style: const TextStyle(
                       fontSize: 40,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
                       letterSpacing: 1.2,
                     ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
-                    '回声智心',
-                    style: TextStyle(
+                    context.l10n.splashSubtitle,
+                    style: const TextStyle(
                       fontSize: 20,
                       color: Colors.white70,
                       letterSpacing: 6,
@@ -78,8 +79,8 @@ class _SplashScreenState extends State<SplashScreen>
               bottom: 64,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  SizedBox(
+                children: [
+                  const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
@@ -87,10 +88,10 @@ class _SplashScreenState extends State<SplashScreen>
                       valueColor: AlwaysStoppedAnimation(Colors.white),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Text(
-                    'Preparing your voice workspace…',
-                    style: TextStyle(color: Colors.white70),
+                    context.l10n.splashPreparing,
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ],
               ),

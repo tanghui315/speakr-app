@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
@@ -8,51 +9,51 @@ class SubscriptionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Usage & Plans')),
+      appBar: AppBar(title: Text(l10n.subscriptionTitle)),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           _QuotaCard(theme: theme),
           const SizedBox(height: 24),
           Text(
-            'Subscriptions',
+            l10n.subscriptionSectionPlans,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 12),
-          const _PlanTile(
-            title: 'Free Plan',
-            description: '300 minutes / month · Core features',
-            priceLabel: 'Current',
+          _PlanTile(
+            title: l10n.subscriptionFreePlan,
+            description: l10n.subscriptionFreePlanSubtitle,
+            priceLabel: l10n.subscriptionCurrentLabel,
             highlightColor: Colors.greenAccent,
           ),
           const SizedBox(height: 12),
-          const _PlanTile(
-            title: 'Pro Unlimited',
-            description:
-                'Unlimited minutes · Priority transcription · Team sharing',
-            priceLabel: 'USD 49 / month',
+          _PlanTile(
+            title: l10n.subscriptionPaidPlan,
+            description: l10n.subscriptionPaidPlanSubtitle,
+            priceLabel: l10n.subscriptionPaidPrice,
             highlightColor: AppColors.highlight,
             isHighlighted: true,
           ),
           const SizedBox(height: 32),
           Text(
-            'History',
+            l10n.subscriptionHistory,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 12),
-          const _HistoryTile(
-            title: 'Invoice · April 2025',
-            subtitle: 'Paid via Apple IAP · USD 49',
+          _HistoryTile(
+            title: l10n.subscriptionInvoice(month: 'April 2025'),
+            subtitle: l10n.subscriptionInvoiceSubtitle(amount: 'USD 49'),
           ),
-          const _HistoryTile(
-            title: 'Invoice · March 2025',
-            subtitle: 'Paid via Apple IAP · USD 49',
+          _HistoryTile(
+            title: l10n.subscriptionInvoice(month: 'March 2025'),
+            subtitle: l10n.subscriptionInvoiceSubtitle(amount: 'USD 49'),
           ),
         ],
       ),
@@ -67,6 +68,7 @@ class _QuotaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -102,16 +104,19 @@ class _QuotaCard extends StatelessWidget {
                 ),
                 Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
+                  children: [
+                    const Text(
                       '180',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
-                    Text('min left', style: TextStyle(color: Colors.white70)),
+                    Text(
+                      l10n.subscriptionMinutesLabel,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
                   ],
                 ),
               ],
@@ -123,15 +128,15 @@ class _QuotaCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Monthly quota resets in 12 days',
+                  l10n.subscriptionQuotaReset(days: '12'),
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Need more minutes? Upgrade to EchoMind Pro Unlimited for priority transcription and shared workspaces.',
-                  style: TextStyle(color: Colors.white70, height: 1.4),
+                Text(
+                  l10n.subscriptionQuotaHelp,
+                  style: const TextStyle(color: Colors.white70, height: 1.4),
                 ),
               ],
             ),

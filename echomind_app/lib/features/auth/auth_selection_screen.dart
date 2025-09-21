@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../home/home_shell.dart';
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class AuthSelectionScreen extends StatelessWidget {
   const AuthSelectionScreen({super.key});
@@ -15,6 +16,7 @@ class AuthSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       body: SafeArea(
@@ -24,7 +26,7 @@ class AuthSelectionScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome back',
+                l10n.authWelcome,
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -32,7 +34,7 @@ class AuthSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Choose a login method to enter your AI voice workspace.',
+                l10n.authSubtitle,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -40,30 +42,30 @@ class AuthSelectionScreen extends StatelessWidget {
               const SizedBox(height: 32),
               _AuthButton(
                 icon: Icons.apple,
-                label: 'Continue with Apple',
+                label: l10n.authContinueApple,
                 onTap: () => _navigateToHome(context),
               ),
               const SizedBox(height: 16),
               _AuthButton(
                 icon: Icons.g_mobiledata,
-                label: 'Continue with Google',
+                label: l10n.authContinueGoogle,
                 onTap: () => _navigateToHome(context),
               ),
               const SizedBox(height: 16),
               _AuthButton(
                 icon: Icons.mail_outline,
-                label: 'Sign in with Email',
+                label: l10n.authContinueEmail,
                 onTap: () => _navigateToHome(context),
               ),
               const Spacer(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  TextButton(onPressed: () {}, child: Text(l10n.authPrivacy)),
                   TextButton(
                     onPressed: () {},
-                    child: const Text('Privacy Policy'),
+                    child: Text(l10n.authLanguageToggle),
                   ),
-                  TextButton(onPressed: () {}, child: const Text('中文 / EN')),
                 ],
               ),
             ],

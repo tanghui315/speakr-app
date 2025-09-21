@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class AiChatScreen extends StatelessWidget {
   const AiChatScreen({super.key});
@@ -8,16 +9,18 @@ class AiChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       behavior: HitTestBehavior.translucent,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('EchoMind AI'),
+          title: Text(l10n.aiTitle),
           actions: [
             IconButton(
               icon: const Icon(Icons.history_toggle_off),
+              tooltip: l10n.aiHistory,
               onPressed: () {},
             ),
           ],
@@ -101,6 +104,7 @@ class _InputArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final isDark = theme.brightness == Brightness.dark;
+    final l10n = context.l10n;
 
     return SafeArea(
       top: false,
@@ -131,7 +135,7 @@ class _InputArea extends StatelessWidget {
                     ),
                     cursorColor: AppColors.primary,
                     decoration: InputDecoration(
-                      hintText: 'Ask across recordings, tags, dates…',
+                      hintText: l10n.aiPlaceholder,
                       hintStyle: TextStyle(
                         color:
                             isDark ? Colors.white70 : AppColors.textSecondary,
@@ -160,7 +164,11 @@ class _InputArea extends StatelessWidget {
                   onPressed: () {
                     FocusScope.of(context).unfocus();
                   },
-                  child: const Icon(Icons.send, color: Colors.white),
+                  child: Semantics(
+                    label: l10n.aiSend,
+                    button: true,
+                    child: const Icon(Icons.send, color: Colors.white),
+                  ),
                 ),
               ],
             ),
@@ -172,9 +180,9 @@ class _InputArea extends StatelessWidget {
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 children: const [
-                  _SuggestionChip(label: 'Highlight key decisions'),
-                  _SuggestionChip(label: 'Search meeting notes'),
-                  _SuggestionChip(label: 'Explain action items'),
+                  _SuggestionChipIconized(kind: _SuggestionKind.decisions),
+                  _SuggestionChipIconized(kind: _SuggestionKind.notes),
+                  _SuggestionChipIconized(kind: _SuggestionKind.actions),
                 ],
               ),
             ),
@@ -185,13 +193,21 @@ class _InputArea extends StatelessWidget {
   }
 }
 
-class _SuggestionChip extends StatelessWidget {
-  const _SuggestionChip({required this.label});
+enum _SuggestionKind { decisions, notes, actions }
 
-  final String label;
+class _SuggestionChipIconized extends StatelessWidget {
+  const _SuggestionChipIconized({required this.kind});
+
+  final _SuggestionKind kind;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final label = switch (kind) {
+      _SuggestionKind.decisions => l10n.aiSuggestDecisions,
+      _SuggestionKind.notes => l10n.aiSuggestNotes,
+      _SuggestionKind.actions => l10n.aiSuggestActions,
+    };
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: ActionChip(

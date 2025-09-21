@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 import '../recording/recording_button.dart';
 import '../recording/recording_live_screen.dart';
 
@@ -10,13 +11,14 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return CustomScrollView(
       slivers: [
         SliverAppBar(
           floating: true,
           title: Text(
-            'EchoMind',
+            l10n.appTitle,
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -43,26 +45,26 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Status',
+                  l10n.homeStatusTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 12),
-                const _StatusCard(
-                  title: 'Live Caption Gateway',
-                  subtitle: 'Connected · 120ms',
+                _StatusCard(
+                  title: l10n.homeLiveCaptionGateway,
+                  subtitle: l10n.homeLiveCaptionStatus(latency: '120'),
                   statusColor: AppColors.accent,
                 ),
                 const SizedBox(height: 12),
-                const _StatusCard(
-                  title: 'Upload Queue',
-                  subtitle: '0 recordings waiting',
+                _StatusCard(
+                  title: l10n.homeUploadQueue,
+                  subtitle: l10n.homeUploadStatus(count: '0'),
                   statusColor: Colors.greenAccent,
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Quick Actions',
+                  l10n.homeQuickActionsTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -71,15 +73,18 @@ class DashboardScreen extends StatelessWidget {
                 Wrap(
                   spacing: 16,
                   runSpacing: 16,
-                  children: const [
+                  children: [
                     _QuickActionCard(
                       icon: Icons.library_music,
-                      title: 'Recording Library',
+                      title: l10n.homeQuickActionLibrary,
                     ),
-                    _QuickActionCard(icon: Icons.chat, title: 'Inquire AI'),
+                    _QuickActionCard(
+                      icon: Icons.chat,
+                      title: l10n.homeQuickActionAI,
+                    ),
                     _QuickActionCard(
                       icon: Icons.workspace_premium,
-                      title: 'Upgrade Subscription',
+                      title: l10n.homeQuickActionUpgrade,
                     ),
                   ],
                 ),
@@ -99,11 +104,12 @@ class _QuotaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Chip(
       avatar: const Icon(Icons.timer, size: 18, color: AppColors.primary),
       backgroundColor: Colors.white,
       label: Text(
-        '$remainingMinutes min left',
+        l10n.homeQuotaLabel(minutes: '$remainingMinutes'),
         style: const TextStyle(color: AppColors.textPrimary),
       ),
     );

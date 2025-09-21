@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class RecordingLiveScreen extends StatefulWidget {
   const RecordingLiveScreen({super.key});
@@ -118,28 +119,34 @@ class _RecordingLiveScreenState extends State<RecordingLiveScreen>
     super.dispose();
   }
 
-  String get _elapsedLabel {
+  String _elapsedLabel(BuildContext context) {
+    final hours = _elapsed.inHours.remainder(24).toString().padLeft(2, '0');
     final minutes = _elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = _elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '00:$minutes:$seconds';
+    return context.l10n.recordingTimerLabel(
+      hours: hours,
+      minutes: minutes,
+      seconds: seconds,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final surface = theme.colorScheme.surface;
+    final l10n = context.l10n;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        title: const Text('Recording'),
+        title: Text(l10n.recordLiveTitle),
         actions: [
           TextButton.icon(
             onPressed: () {},
             icon: const Icon(Icons.cloud_done_outlined, color: Colors.white70),
-            label: const Text('Streaming'),
+            label: Text(l10n.recordLiveStreaming),
           ),
           const SizedBox(width: 8),
         ],
@@ -152,11 +159,17 @@ class _RecordingLiveScreenState extends State<RecordingLiveScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _StatusChip(icon: Icons.timer_outlined, label: _elapsedLabel),
-                  _StatusChip(icon: Icons.wifi_tethering, label: '120 ms'),
+                  _StatusChip(
+                    icon: Icons.timer_outlined,
+                    label: _elapsedLabel(context),
+                  ),
+                  _StatusChip(
+                    icon: Icons.wifi_tethering,
+                    label: l10n.recordLiveLatency(latency: '120'),
+                  ),
                   _StatusChip(
                     icon: Icons.battery_charging_full,
-                    label: 'Free 179 min',
+                    label: l10n.recordLiveFreeMinutes(minutes: '179'),
                   ),
                 ],
               ),
@@ -343,17 +356,17 @@ class _ControlBar extends StatelessWidget {
           children: [
             _ControlButton(
               icon: Icons.pause_rounded,
-              label: 'Pause',
+              label: context.l10n.recordLivePause,
               onTap: () {},
             ),
             _ControlButton(
               icon: Icons.flag_outlined,
-              label: 'Mark',
+              label: context.l10n.recordLiveMark,
               onTap: () {},
             ),
             _ControlButton(
               icon: Icons.bookmark_outline,
-              label: 'Tag',
+              label: context.l10n.recordLiveTag,
               onTap: () {},
             ),
             ElevatedButton.icon(
@@ -370,7 +383,7 @@ class _ControlBar extends StatelessWidget {
                 ),
               ),
               icon: const Icon(Icons.stop_circle_outlined),
-              label: const Text('Finish'),
+              label: Text(context.l10n.recordLiveFinish),
             ),
           ],
         ),

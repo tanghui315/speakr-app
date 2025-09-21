@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
@@ -8,6 +9,7 @@ class LibraryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Recording Library')),
@@ -17,7 +19,7 @@ class LibraryScreen extends StatelessWidget {
           children: [
             TextField(
               decoration: InputDecoration(
-                hintText: 'Search recordings, tags, speakers…',
+                hintText: l10n.librarySearchHint,
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -32,11 +34,11 @@ class LibraryScreen extends StatelessWidget {
               height: 40,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: const [
-                  _FilterChip(label: 'All'),
-                  _FilterChip(label: 'Interview'),
-                  _FilterChip(label: 'Meeting'),
-                  _FilterChip(label: 'Highlights'),
+                children: [
+                  _FilterChip(label: l10n.libraryFilterAll),
+                  _FilterChip(label: l10n.libraryFilterInterview),
+                  _FilterChip(label: l10n.libraryFilterMeeting),
+                  _FilterChip(label: l10n.libraryFilterHighlights),
                 ],
               ),
             ),

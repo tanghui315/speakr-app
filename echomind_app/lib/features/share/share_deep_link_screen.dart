@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class ShareDeepLinkScreen extends StatelessWidget {
   const ShareDeepLinkScreen({super.key});
@@ -17,7 +18,7 @@ class ShareDeepLinkScreen extends StatelessWidget {
                 expandedHeight: 180,
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
-                  title: const Text('Shared recording'),
+                  title: Text(context.l10n.shareScreenTitle),
                   background: Container(
                     decoration: const BoxDecoration(
                       gradient: AppColors.primaryGradient,
@@ -33,15 +34,19 @@ class ShareDeepLinkScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Shared by Ava Chen',
+                            context.l10n.shareSharedBy(name: 'Ava Chen'),
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'Product launch sync · 18 Apr 2025 · 32 min',
-                            style: TextStyle(color: Colors.white70),
+                          Text(
+                            context.l10n.shareMeta(
+                              title: 'Product launch sync',
+                              date: '18 Apr 2025',
+                              duration: '32 min',
+                            ),
+                            style: const TextStyle(color: Colors.white70),
                           ),
                         ],
                       ),
@@ -63,12 +68,10 @@ class ShareDeepLinkScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _CardTitle('Executive summary'),
-                    SizedBox(height: 12),
-                    _CardBody(
-                      'EchoMind outlines launch milestones, marketing deliverables, and risk mitigations. Key highlights include campaign timeline approval and AI captioning demo readiness.',
-                    ),
+                  children: [
+                    _CardTitle(context.l10n.shareSummaryTitle),
+                    const SizedBox(height: 12),
+                    _CardBody(context.l10n.recordLiveMockBody),
                   ],
                 ),
               ),
@@ -90,8 +93,10 @@ class ShareDeepLinkScreen extends StatelessWidget {
                   ),
                   child: const Icon(Icons.play_arrow, color: Colors.white),
                 ),
-                title: const _CardTitle('Play recording'),
-                subtitle: const _CardBody('Stream in-app · 32:14'),
+                title: _CardTitle(context.l10n.sharePlay),
+                subtitle: _CardBody(
+                  context.l10n.shareStreamLabel(duration: '32:14'),
+                ),
                 trailing: IconButton(
                   icon: const Icon(
                     Icons.download_outlined,
@@ -104,7 +109,7 @@ class ShareDeepLinkScreen extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               icon: const Icon(Icons.login),
-              label: const Text('Sign in to comment'),
+              label: Text(context.l10n.shareSignIn),
               onPressed: () {},
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),

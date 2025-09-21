@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class RecordingButton extends StatefulWidget {
   const RecordingButton({super.key, this.onStart});
@@ -60,6 +61,7 @@ class _RecordingButtonState extends State<RecordingButton>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Center(
       child: Stack(
         alignment: Alignment.center,
@@ -116,16 +118,21 @@ class _RecordingButtonState extends State<RecordingButton>
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      _isRecording ? 'Stop' : 'Tap to start',
+                      _isRecording
+                          ? l10n.recordButtonStop
+                          : l10n.recordButtonStart,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Real-time AI captions',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    Text(
+                      l10n.recordButtonTagline,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),

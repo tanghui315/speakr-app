@@ -1,57 +1,59 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/l10n/l10n.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        children: const [
-          _SectionTitle('Account & Security'),
+        children: [
+          _SectionTitle(l10n.settingsAccountSection),
           _SettingsTile(
             icon: Icons.devices,
-            title: 'Manage devices',
-            subtitle: 'View active sessions and revoke access',
+            title: l10n.settingsManageDevices,
+            subtitle: l10n.settingsManageDevicesSubtitle,
           ),
           _SettingsTile(
             icon: Icons.lock_reset,
-            title: 'Reset password',
-            subtitle: 'Update password or enable passkeys',
+            title: l10n.settingsResetPassword,
+            subtitle: l10n.settingsResetPasswordSubtitle,
           ),
-          _SectionTitle('Preferences'),
+          _SectionTitle(l10n.settingsPreferencesSection),
           _SettingsTile(
             icon: Icons.language,
-            title: 'Language',
-            subtitle: '中文 / English',
+            title: l10n.settingsLanguage,
+            subtitle: l10n.settingsLanguageSubtitle,
           ),
           _SettingsTile(
             icon: Icons.dark_mode,
-            title: 'Appearance',
-            subtitle: 'Light · Dark · System',
+            title: l10n.settingsAppearance,
+            subtitle: l10n.settingsAppearanceSubtitle,
           ),
           _SettingsTile(
             icon: Icons.storage,
-            title: 'Cache & downloads',
-            subtitle: '540 MB · Tap to manage',
+            title: l10n.settingsCache,
+            subtitle: l10n.settingsCacheSubtitle,
           ),
-          _SectionTitle('Diagnostics'),
+          _SectionTitle(l10n.settingsDiagnosticsSection),
           _SettingsTile(
             icon: Icons.graphic_eq,
-            title: 'ASR Gateway status',
-            subtitle: 'Operational · 120ms avg latency',
+            title: l10n.settingsAsrStatus,
+            subtitle: l10n.settingsAsrStatusSubtitle,
           ),
           _SettingsTile(
             icon: Icons.info_outline,
-            title: 'App info',
-            subtitle: 'Version 0.1.0 (Build 1)',
+            title: l10n.settingsAppInfo,
+            subtitle: l10n.settingsAppInfoSubtitle,
           ),
-          SizedBox(height: 24),
-          _DangerZoneButton(),
+          const SizedBox(height: 24),
+          const _DangerZoneButton(),
         ],
       ),
     );
@@ -135,10 +137,11 @@ class _DangerZoneButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return OutlinedButton.icon(
       onPressed: () {},
       icon: const Icon(Icons.logout),
-      label: const Text('Sign out of all devices'),
+      label: Text(l10n.settingsSignOutAll),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.redAccent,
         side: const BorderSide(color: Colors.redAccent),
