@@ -8,7 +8,6 @@ try:
     from flask import Markup
 except ImportError:
     from markupsafe import Markup
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from openai import OpenAI # Keep using the OpenAI library
 import json
@@ -33,14 +32,11 @@ mimetypes.add_type('audio/x-m4a', '.m4a')
 mimetypes.add_type('audio/webm', '.webm')
 mimetypes.add_type('audio/flac', '.flac')
 mimetypes.add_type('audio/ogg', '.ogg')
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_bcrypt import Bcrypt
+from flask_login import UserMixin, login_user, logout_user, login_required, current_user
 from flask_wtf import FlaskForm
 from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 import pytz
 from babel.dates import format_datetime
 import ast
@@ -48,6 +44,7 @@ import logging
 import secrets
 import time
 from src.audio_chunking import AudioChunkingService, ChunkProcessingError, ChunkingNotSupportedError
+from src.extensions import db, bcrypt, login_manager, limiter, jwt
 
 # Optional imports for embedding functionality
 try:
@@ -98,14 +95,6 @@ root_logger.addHandler(handler)
 app_logger = logging.getLogger('werkzeug')
 app_logger.setLevel(log_level)
 app_logger.addHandler(handler)
-
-# --- Rate Limiting Setup (will be configured after app creation) ---
-# TEMPORARILY INCREASED FOR TESTING - REVERT FOR PRODUCTION!
-limiter = Limiter(
-    get_remote_address,
-    app=None,  # Defer initialization
-    default_limits=["5000 per day", "1000 per hour"]  # Increased from 200/day, 50/hour for testing
-)
 
 def auto_close_json(json_string):
     """
@@ -299,9 +288,6 @@ def extract_json_object(text):
     
     # Return original if no JSON structure found
     return text
-
-# Initialize Flask-Bcrypt
-bcrypt = Bcrypt()
 
 # Helper function to convert markdown to HTML
 def sanitize_html(text):
@@ -562,6 +548,20 @@ app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', '/data/uploads')
 # MAX_CONTENT_LENGTH will be set dynamically after database initialization
 # Set a secret key for session management and CSRF protection
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-dev-key-change-in-production')
+app.config.setdefault('JWT_SECRET_KEY', os.environ.get('JWT_SECRET_KEY', app.config['SECRET_KEY']))
+app.config.setdefault('JWT_TOKEN_LOCATION', ['headers'])
+app.config.setdefault('JWT_HEADER_TYPE', 'Bearer')
+app.config.setdefault(
+    'JWT_ACCESS_TOKEN_EXPIRES',
+    timedelta(minutes=int(os.environ.get('JWT_ACCESS_MINUTES', 30))),
+)
+app.config.setdefault(
+    'JWT_REFRESH_TOKEN_EXPIRES',
+    timedelta(days=int(os.environ.get('JWT_REFRESH_DAYS', 30))),
+)
+app.config.setdefault('AUTH_DEMO_MODE', os.environ.get('AUTH_DEMO_MODE', 'false').lower() == 'true')
+app.config.setdefault('AUTH_DEMO_EMAIL', os.environ.get('AUTH_DEMO_EMAIL', 'demo@speakr.local'))
+app.config.setdefault('AUTH_DEMO_PASSWORD', os.environ.get('AUTH_DEMO_PASSWORD', 'demo1234'))
 
 # Apply ProxyFix to handle headers from a reverse proxy (like Nginx or Caddy)
 # This is crucial for request.is_secure to work correctly behind an SSL-terminating proxy.
@@ -574,16 +574,15 @@ app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for local network usag
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Still protect against XSS
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
 
-db = SQLAlchemy()
 db.init_app(app)
 
 # Initialize Flask-Login and other extensions
-login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 bcrypt.init_app(app)
 limiter.init_app(app)  # Initialize the limiter (uses in-memory storage by default)
+jwt.init_app(app)
 
 csrf = CSRFProtect(app)
 
@@ -625,6 +624,11 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Assuming the instance folder is handled correctly by Flask or created by setup.sh
 # os.makedirs(os.path.dirname(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '/')), exist_ok=True)
 
+
+# Register API blueprints
+from src.auth_api import auth_bp
+
+app.register_blueprint(auth_bp)
 
 # --- User loader for Flask-Login ---
 @login_manager.user_loader
@@ -1230,6 +1234,9 @@ class User(db.Model, UserMixin):
     
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
+
+
+app.config['AUTH_USER_MODEL'] = User
 class Speaker(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
